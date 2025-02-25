@@ -143,9 +143,6 @@ ggplot(metric.schaefer400.all, aes(x = age,
   # xlim(6, 22) +
   ylim(lolim, hilim)
 
-# ggsave(paste(outpath, sprintf('%s_%s.png', dtype, gamtype), sep = ""),
-#        dpi = 300,
-#        plot = last_plot())
 ggsave(paste(outpath, sprintf('%s_%s.svg', dtype, gamtype), sep = ""),
        dpi = 300,
        plot = last_plot())
@@ -214,9 +211,6 @@ ggplot(data = metric.schaefer400.all, aes(x = p_factor_mcelroy_harmonized_all_sa
   # xlim(-2, 3) +
   ylim(lolim, hilim)
 
-# ggsave(paste(outpath, sprintf('%s_%s.png', dtype, gamtype), sep = ""),
-#        dpi = 300,
-#        plot = last_plot())
 ggsave(paste(outpath, sprintf('%s_%s.svg', dtype, gamtype), sep = ""),
        dpi = 300,
        plot = last_plot())
@@ -324,10 +318,6 @@ ggplot(gam.variable.schaefer, aes(x = GAM.variable.partialR2)) +
   geom_histogram(binwidth=.01, fill="darkcyan", color="#e9ecef", alpha=0.9) + 
   theme_bw()
 
-# ggsave(filename = paste(outpath, sprintf('%s_%s_histogram_partialR2.png', dtype, 
-#                                          gamtype), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
 ggsave(filename = paste(outpath, sprintf('%s_%s_histogram_partialR2.svg', dtype, 
                                          gamtype), 
                         sep = ""), 
@@ -344,16 +334,7 @@ ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
                                     na.value="transparent", direction = -1, 
                                     limits = c(-maxval, maxval), 
                                     oob = squish)
-# grDevices::RdPu
-# grDevices::PinkYl
-# ggthemes::Red-Blue Diverging
-# grDevices::Spectral
-# pals::ocean.matter
-# pals::coolwarm
-# ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_partialR2.png', dtype, 
-#                                          gamtype), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
+
 ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_partialR2.svg', dtype, 
                                          gamtype), 
                         sep = ""), 
@@ -381,10 +362,7 @@ ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
                                     limits = c(-maxval, maxval), 
                                     oob = squish) 
 
-# ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_rank_partialR2.png', 
-#                                          dtype, gamtype), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
+
 ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_rank_partialR2.svg', 
                                          dtype, gamtype), 
                         sep = ""), 
@@ -399,9 +377,6 @@ Anovasignumber = sum(pvaluesfdrs < 0.05, na.rm=TRUE)
 pvaluesfdrs[pvaluesfdrs >= 0.05] <- NA
 gam.variable.schaefer$Anova.variable.pvaluefdr <- pvaluesfdrs
 
-# nannumber = sum(metric.regional.statistics$GAM.smooth.pvalue < 0.05)
-# metric.regional.statistics$GAM.smooth.pvalue[metric.regional.statistics$GAM.smooth.pvalue >= 0.05] <- NA
-
 ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400", 
       mapping=aes(fill = Anova.variable.pvaluefdr, colour=I("#e9ecef"), size=I(.03)), 
       position = c("stacked")) + theme_void() + ggtitle(Anovasignumber) +
@@ -412,10 +387,6 @@ ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
                                     #            max(metric.regional.statistics$GAM.smooth.pvalue)), 
                                     oob = squish) 
 
-# ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_pval_partialR2.png', 
-#                                          dtype, gamtype), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
 ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_pval_partialR2.svg', 
                                          dtype, gamtype), 
                         sep = ""), 
@@ -439,10 +410,6 @@ ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
                                     limits = c(-maxval, maxval), 
                                     oob = squish) 
 
-# ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_ranksig_partialR2.png', 
-#                                          dtype, gamtype), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
 ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_ranksig_partialR2.svg', 
                                          dtype, gamtype), 
                         sep = ""), 
@@ -609,59 +576,6 @@ for(row in c(1:nrow(data_labels))){
 }
 print(b)
 
-# ggsave(paste(outpath, sprintf('studyfits_%s_%s.png', outlabel, gamtype), sep = ""),
-#        dpi = 300,
-#        plot = last_plot())
 ggsave(paste(outpath, sprintf('studyfits_%s_%s.svg', outlabel, gamtype), sep = ""),
        dpi = 300,
        plot = last_plot())
-
-# # brain sig
-# pvalues = gam.age.schaefer$GAM.age.pvalue
-# pvaluesfdrs <- p.adjust(pvalues, method="BH")
-# allR2sig <- gam.age.schaefer$GAM.age.partialR2
-# allR2sig[(pvaluesfdrs >= 0.05)] <- NA
-# gam.age.schaefer$GAM.age.partialR2sig <- allR2sig
-# 
-# ggseg(.data = gam.age.schaefer, atlas = "schaefer7_400", 
-#       mapping=aes(fill = GAM.age.partialR2sig, colour=I("#e9ecef"), 
-#                   size=I(.03)), position = c("stacked")) + 
-#   theme_void() + 
-#   paletteer::scale_fill_paletteer_c("pals::ocean.matter", 
-#                                     na.value="transparent", direction = -1, 
-#                                     limits = c(min(gam.age.schaefer$GAM.age.partialR2), 
-#                                                max(gam.age.schaefer$GAM.age.partialR2)), 
-#                                     oob = squish) 
-# 
-# ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_sig_partialR2_%s_%s.png', dtype, smoothterm), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
-# ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_sig_partialR2_%s_%s.svg', dtype, smoothterm), 
-#                         sep = ""), 
-#        dpi = 300, width = 3 , height = 2)
-
-# # SA rank comparison
-# rho = cor.test(gam.age.schaefer$GAM.age.partialR2, gam.age.schaefer$SA.rank, method = c("spearman"))
-# 
-# ggplot(gam.age.schaefer, aes(x = SA.rank, y = GAM.age.partialR2, fill = SA.rank)) + 
-#   geom_point(aes(color = SA.rank), shape = 21, size = 2) +
-#   scale_fill_gradient2(low = "goldenrod1", mid = "white", high = "#6f1282", 
-#                        guide = "colourbar", aesthetics = "fill", name = NULL, 
-#                        midpoint = 200) +
-#   scale_fill_gradient2(low = "goldenrod1", mid = "white", high = "#6f1282", 
-#                        guide = "colourbar", aesthetics = "color", name = NULL, 
-#                        midpoint = 200) +
-#   labs(x="\nS-A rank", y="partial R2\n") +
-#   ggtitle(rho$estimate) +
-#   geom_smooth(method = 'lm', se = TRUE, fill = alpha(c("gray70"),.7), col = "black", linewidth = 1) +
-#   theme_classic() + 
-#   theme(legend.position = "none") +
-#   theme(axis.text = element_text(size = 12, family = "Arial", color = c("black")), 
-#         axis.title = element_text(size = 12, family = "Arial", color = c("black")))
-# 
-# ggsave(filename = paste(outpath, sprintf('%s_%s_SArank_partialR2.png', dtype, smoothterm), 
-#                         sep = ""), 
-#        plot = last_plot())
-# ggsave(filename = paste(outpath, sprintf('%s_%s_SArank_partialR2.svg', dtype, smoothterm), 
-#                         sep = ""), 
-#        plot = last_plot())

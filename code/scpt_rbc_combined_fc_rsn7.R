@@ -106,8 +106,6 @@ if(gamtype == 'age'){
   pvalues = gam.age$Anova.age.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
   
-  # nannumber = sum(pvaluesfdrs < 0.05)
-  # pvaluesfdrs[pvaluesfdrs >= 0.05] <- NA
   gam.age$Anova.age.pvaluefdr <- pvaluesfdrs
   
   # make sure values are numerical
@@ -153,8 +151,6 @@ if(gamtype == 'pfactor'){
   pvalues = gam.pfactor$Anova.pfactor.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
   
-  # nannumber = sum(pvaluesfdrs < 0.05)
-  # pvaluesfdrs[pvaluesfdrs >= 0.05] <- NA
   gam.pfactor$Anova.pfactor.pvaluefdr <- pvaluesfdrs
   
   # make sure values are numerical
@@ -210,9 +206,6 @@ if(gamtype == 'pfactor'){
     scale_x_continuous(breaks=c(-2, -1, 0, 1, 2, 3), limits=c(-2, 3), expand = c(0.05,.05)) +
     ylim(-0.25, 0.75) # between
   
-  # ggsave(paste(outpath, sprintf('%s_%s_%s.png', dtype, gamtype, networkpair), sep = ""),
-  #        dpi = 300,
-  #        plot = last_plot())
   ggsave(paste(outpath, sprintf('%s_%s_%s.svg', dtype, gamtype, networkpair), sep = ""),
          dpi = 300,
          plot = last_plot())
@@ -253,9 +246,6 @@ if(gamtype == 'age'){
     (if (withinrsn == TRUE){ylim(0.03, 0.8)}
      else{ylim(-0.40, 0.75)})
   
-  # ggsave(paste(outpath, sprintf('%s_%s_%s.png', dtype, gamtype, networkpair), sep = ""),
-  #        dpi = 300,
-  #        plot = last_plot())
   ggsave(paste(outpath, sprintf('%s_%s_%s.svg', dtype, gamtype, networkpair), sep = ""),
          dpi = 300,
          plot = last_plot())
@@ -388,31 +378,7 @@ for(row in c(1:nrow(data_labels))){
 }
 print(b)
 
-# ggsave(paste(outpath, sprintf('studyfits_%s_%s_%s.png', outlabel, gamtype, networkpair), sep = ""),
-#        dpi = 300,
-#        plot = last_plot())
 ggsave(paste(outpath, sprintf('studyfits_%s_%s_%s.svg', outlabel, gamtype, networkpair), sep = ""),
        dpi = 300,
        plot = last_plot())
-
-
-# # Estimate GAM smooths based on model-predicted data and save out predicted y data**   
-# gam.smooths <- matrix(data=NA, ncol=7) #empty matrix to save gam.predsmooth fits to
-# colnames(gam.smooths) <- c("age","fit","se.fit","selo","sehi","index","label")
-# 
-# for(row in c(1:length(netpair_labels))){ #for each region
-#   netpair <- netpair_labels[row] 
-#   GAM.SMOOTH <- gam.predsmooth(measure = "netpair", atlas = "schaefer200", conn_type = "orig", region = netpair, smooth_var = "age", covariates = "sex + meanFD_avgSes") #run the gam.predsmooth function
-#   
-#   preddata <- as.data.frame(GAM.SMOOTH[3]) #get predicted.smooth df from function output
-#   preddata$index <- rep(x=row, 1000) #region index
-#   preddata$label <- rep(x=GAM.SMOOTH[1], 1000) #label
-#   gam.smooths <- rbind(gam.smooths, preddata)
-#   
-#   
-# }
-# gam.smooths <- gam.smooths[-1,] #remove empty initialization row
-# gam.smooths$label <- as.character(gam.smooths$label)
-# 
-# 
-# write.csv(gam.smooths, sprintf("%1$sGAMsmoothfits.networkpair.csv", gam_dir), row.names = F, quote = F)
+       
