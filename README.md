@@ -5,13 +5,6 @@ Shafiei G, Esper NB, et al., (2022). Reproducible Brain Charts: An open data res
 
 Please cite appropriately and consult [https://reprobrainchart.github.io/docs/get_data](https://reprobrainchart.github.io/docs/get_data) to download and prepare the necessary datasets before using this repository.
 
-## `code`
-The [code](code/) folder contains all the code used to run the analyses and generate the figures.
-
-## `data`
-The [data](data/) folder contains the data used to run the analyses. 
-
-
 
 ## `code`
 All analysis and data preparation code is located in the [`code/`](code/) folder. Code is written in Python and R.
