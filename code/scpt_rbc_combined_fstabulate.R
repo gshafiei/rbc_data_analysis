@@ -1,6 +1,7 @@
 
 rm(list = ls())
 
+# Load required libraries and helper GAM functions
 library(stringr)
 library(tidyr)
 library(mgcv)
@@ -17,6 +18,7 @@ library(scales)
 
 source("/Users/gshafiei/Desktop/RBC/code/func_GAM_rbc.R")
 
+# Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
 data_path <- paste(project_path, 'data/dataR/', sep = "")
 outpath <- paste(project_path, 'results/structure/', sep = "")
@@ -25,20 +27,26 @@ outpath <- paste(project_path, 'results/structure/', sep = "")
 # combined_df_ct_noqc_pfactor_filter
 # combined_df_ct_artifact_pfactor_filter
 # combined_df_ct_artifact_pfactor_filter_harmonized
-# 
+#
 # # for age
 # combined_df_ct_noqc
 # combined_df_ct_artifact
 # combined_df_ct_artifact_harmonized
 
-dataset <- 'combined'
-qc_version <- 'artifact' # 'artifact' or 'noqc'
-gamtype <- 'pfactor' # 'age' or 'pfactor'
-harmonized <- TRUE
-controlformean <- FALSE
+# Define modeling parameters
+dataset <- 'combined' # combined data across studies
+qc_version <- 'artifact' # can be 'artifact' or 'noqc'
+gamtype <- 'pfactor' # can be 'age' or 'pfactor'
+harmonized <- TRUE # whether to use harmonized data
+controlformean <- FALSE # whether to include mean map as covariate
 
+# Metric of interest (e.g., 'ct', 'sa', 'gv', 'lgi') and associated map
 metric <- 'lgi'
 corticalmap <- 'meanVal'
+
+# Dynamically build filename for the dataset based on flags
+# Selects appropriate TSV input depending on predictors and harmonization status
+# Output: dtype (dataset label string)
 if (harmonized == TRUE){corticalmap <- 'meanValHarmonized'}
 
 if (gamtype == 'age'){
@@ -61,15 +69,17 @@ if (gamtype == 'pfactor'){smooth_var <- 'age'}
 if (gamtype == 'pfactor'){covars <- 'sex + euler'}
 if (gamtype == 'pfactor'){linear_var <- 'p_factor_mcelroy_harmonized_all_samples'}
 
-# prepare data for GAMs
+# Load and prepare the dataset for GAMs
+# Schaefer-400 parcellation -- structural data
 metric.schaefer400.all <- read.csv(paste(data_path, sprintf('%s.tsv', dtype),
-                                         sep = ""), 
+                                         sep = ""),
                                    sep = '\t')
 # will use dataframe as a covariate
 metric.schaefer400.all$dataset <- as.factor(metric.schaefer400.all$study)
 # will use sex as a covariate
 metric.schaefer400.all$sex <- as.factor(metric.schaefer400.all$sex)
 
+# If enabled, adjust covariates to control for mean cortical value
 if (controlformean == TRUE){
   if (harmonized == TRUE){
     meanmapcovar <- metric.schaefer400.all$meanValHarmonized
@@ -80,28 +90,35 @@ if (controlformean == TRUE){
 }
 
 ###############################
+# Section 1: Overall Fit for Mean Value
 # Fit a gam for combined mean values
 ###############################
+# Fit a GAM using mean value (e.g., meanVal or meanValHarmonized)
+# gam.fit.smooth() for age-related analysis: age as smooth term
+# gam.fit.linear() for linear p-factor modeling
+# Predict fitted values with confidence intervals using custom predict functions
+# Plot curve with ggplot2 and save as SVG
+
 #### PREDICT GAM SMOOTH FITTED VALUES ####
 if(gamtype == 'age'){
-  GAM.RESULTS <- gam.fit.smooth(measure = 'metric', atlas = 'schaefer400', 
-                                dataset = 'all', region = corticalmap, 
+  GAM.RESULTS <- gam.fit.smooth(measure = 'metric', atlas = 'schaefer400',
+                                dataset = 'all', region = corticalmap,
                                 smooth_var = smooth_var, covariates = covars,
                                 knots = 3, set_fx = FALSE, stats_only = FALSE)
   gam.results <- as.data.frame(GAM.RESULTS)
-  
-  ctx.predicted.metric <- gam.smooth.predict(measure = 'metric', 
+
+  ctx.predicted.metric <- gam.smooth.predict(measure = 'metric',
                                              atlas = 'schaefer400',
-                                             dataset = 'all', 
+                                             dataset = 'all',
                                              region = corticalmap,
-                                             smooth_var = smooth_var, 
+                                             smooth_var = smooth_var,
                                              covariates = covars,
-                                             knots = 3, set_fx = FALSE, 
+                                             knots = 3, set_fx = FALSE,
                                              increments = 200)
-  
+
   # get predicted.smooth df from function output
   ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-  
+
   # plot age
   if(metric == 'ct'){
     lolim <- 2.0
@@ -120,17 +137,17 @@ if(gamtype == 'age'){
     hilim <- 4.0
   } # lgi
 
-ggplot(metric.schaefer400.all, aes(x = age, 
+ggplot(metric.schaefer400.all, aes(x = age,
                                    if (harmonized == TRUE){y = meanValHarmonized}
                                    else{y = meanVal})) +
   geom_point(aes(color = dataset), size = 2) + # color = "#115c25"
   geom_ribbon(data = ctx.predicted.metric, aes(x = age, y = .fitted,
-                                               ymin = .lower_ci, 
+                                               ymin = .lower_ci,
                                                ymax = .upper_ci),
               alpha = .7, linetype = 0,) +
   geom_line(data = ctx.predicted.metric, aes(x = age, y = .fitted)) +
-  labs(x='\nage', y=sprintf('%s\n', corticalmap), 
-       title=sprintf('partialR2=%s\nanovaPval=%s\n', 
+  labs(x='\nage', y=sprintf('%s\n', corticalmap),
+       title=sprintf('partialR2=%s\nanovaPval=%s\n',
                      gam.results$partialRsq, gam.results$anova.smooth.pvalue)) +
   theme_classic() +
   theme(
@@ -149,27 +166,27 @@ ggsave(paste(outpath, sprintf('%s_%s.svg', dtype, gamtype), sep = ""),
 }
 
 if(gamtype == 'pfactor'){
-  GAM.RESULTS <- gam.fit.linear(measure = 'metric', atlas = 'schaefer400', 
-                                dataset = 'all', region = corticalmap, 
-                                smooth_var = smooth_var, 
+  GAM.RESULTS <- gam.fit.linear(measure = 'metric', atlas = 'schaefer400',
+                                dataset = 'all', region = corticalmap,
+                                smooth_var = smooth_var,
                                 linear_var = linear_var,
                                 covariates = covars,
                                 knots = 3, set_fx = FALSE)
   gam.results <- as.data.frame(GAM.RESULTS)
-  
-  ctx.predicted.metric <- gam.linear.predict(measure = 'metric', 
+
+  ctx.predicted.metric <- gam.linear.predict(measure = 'metric',
                                              atlas = 'schaefer400',
-                                             dataset = 'all', 
+                                             dataset = 'all',
                                              region = corticalmap,
-                                             smooth_var = smooth_var, 
+                                             smooth_var = smooth_var,
                                              linear_var = linear_var,
                                              covariates = covars,
-                                             knots = 3, set_fx = FALSE, 
+                                             knots = 3, set_fx = FALSE,
                                              increments = 200)
-  
+
   # get predicted.smooth df from function output
   ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-  
+
   # plot p-factor
   if(metric == 'ct'){
     lolim <- 2.0
@@ -197,8 +214,8 @@ ggplot(data = metric.schaefer400.all, aes(x = p_factor_mcelroy_harmonized_all_sa
               alpha = .7, linetype = 0,) +
   geom_line(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples,
                                              y = .fitted)) +
-  labs(x="\npfactor", y=sprintf('%s\n', corticalmap), 
-       title=sprintf('partialR2=%s\nanovaPval=%s\n', 
+  labs(x="\npfactor", y=sprintf('%s\n', corticalmap),
+       title=sprintf('partialR2=%s\nanovaPval=%s\n',
                      gam.results$partialRsq, gam.results$anova.linear.pvalue)) +
   theme_classic() +
   theme(
@@ -216,8 +233,18 @@ ggsave(paste(outpath, sprintf('%s_%s.svg', dtype, gamtype), sep = ""),
        plot = last_plot())
 }
 
+##############################
+# Section 2: Parcel-wise GAM Analyses
+##############################
+# Loop through 400 Schaefer parcels and run region-specific GAMs
+# Collect GAM stats (F, p, partial R2, etc.)
+# Save output as .csv
 
-
+# Merge with SA rank and adjust p-values (FDR)
+# Plot histograms (partial R2 dist) and brain maps:
+#   - partial R2 values
+#   - FDR-significant p-values
+#   - R2-based rank and rank significance maps
 
 if(dataset == 'combined'){
 #### Region-wise GAM Statistics and Derivative-based Temporal Developmental Properties ####
@@ -228,22 +255,22 @@ if(gamtype=='age'){
   gam.variable.schaefer <- matrix(data=NA, nrow=400, ncol=10)
   #for each schaefer region
   for(row in c(1:nrow(schaefer.regions))){
-    region <- schaefer.regions$region[row] 
-    GAM.RESULTS <- gam.fit.smooth(measure = "metric", atlas = "schaefer400", 
-                                  dataset = "all", 
-                                  region = region, smooth_var = smooth_var, 
-                                  covariates = covars, 
+    region <- schaefer.regions$region[row]
+    GAM.RESULTS <- gam.fit.smooth(measure = "metric", atlas = "schaefer400",
+                                  dataset = "all",
+                                  region = region, smooth_var = smooth_var,
+                                  covariates = covars,
                                   knots = 3, set_fx = FALSE, stats_only = FALSE)
-    #and append results to output df 
+    #and append results to output df
     gam.variable.schaefer[row,] <- GAM.RESULTS}
-  
+
   gam.variable.schaefer <- as.data.frame(gam.variable.schaefer)
   colnames(gam.variable.schaefer) <- c("region","GAM.variable.Fvalue","GAM.variable.pvalue",
                                        "GAM.variable.partialR2","Anova.variable.pvalue",
                                        "age.onsetchange", "age.peakchange",
                                        "minage.decrease","maxage.increase","age.maturation")
-  cols = c(2:10)    
-  gam.variable.schaefer[,cols] = apply(gam.variable.schaefer[,cols], 2, 
+  cols = c(2:10)
+  gam.variable.schaefer[,cols] = apply(gam.variable.schaefer[,cols], 2,
                                        function(x) as.numeric(as.character(x)))
 }
 
@@ -251,27 +278,27 @@ if(gamtype=='pfactor'){
   gam.variable.schaefer <- matrix(data=NA, nrow=400, ncol=5)
   #for each schaefer region
   for(row in c(1:nrow(schaefer.regions))){
-    region <- schaefer.regions$region[row] 
-    GAM.RESULTS <- gam.fit.linear(measure = "metric", atlas = "schaefer400", 
-                                  dataset = "all", 
-                                  region = region, 
-                                  smooth_var = smooth_var, 
+    region <- schaefer.regions$region[row]
+    GAM.RESULTS <- gam.fit.linear(measure = "metric", atlas = "schaefer400",
+                                  dataset = "all",
+                                  region = region,
+                                  smooth_var = smooth_var,
                                   linear_var = linear_var,
-                                  covariates = covars, 
+                                  covariates = covars,
                                   knots = 3, set_fx = FALSE)
-    #and append results to output df 
+    #and append results to output df
     gam.variable.schaefer[row,] <- GAM.RESULTS}
-  
+
   gam.variable.schaefer <- as.data.frame(gam.variable.schaefer)
   colnames(gam.variable.schaefer) <- c("region","GAM.variable.Fvalue","GAM.variable.pvalue",
                                        "GAM.variable.partialR2","Anova.variable.pvalue")
-  cols = c(2:5)    
-  gam.variable.schaefer[,cols] = apply(gam.variable.schaefer[,cols], 2, 
+  cols = c(2:5)
+  gam.variable.schaefer[,cols] = apply(gam.variable.schaefer[,cols], 2,
                                        function(x) as.numeric(as.character(x)))
 }
 
-write.csv(gam.variable.schaefer, paste(outpath, sprintf('csvFiles/%s_%s_statistics.csv', 
-                                                   dtype, gamtype), 
+write.csv(gam.variable.schaefer, paste(outpath, sprintf('csvFiles/%s_%s_statistics.csv',
+                                                   dtype, gamtype),
                                   sep=""),
           row.names = F, quote = F)
 rm(gam.variable.schaefer)
@@ -279,13 +306,13 @@ gc()
 
 # re-read the results from above and compare with SA
 #GAM age smooth statistics, generated with fitGAMs_fluctuationamplitude_age.R
-gam.variable.schaefer <- read.csv(paste(outpath, sprintf('csvFiles/%s_%s_statistics.csv', 
-                                                    dtype, gamtype), 
+gam.variable.schaefer <- read.csv(paste(outpath, sprintf('csvFiles/%s_%s_statistics.csv',
+                                                    dtype, gamtype),
                                    sep=""))
 
 # SA axis
-sa.schaefer400 <- read.csv(paste(project_path, 
-                                 'data/SArank_schaefer400_7Networks.csv', 
+sa.schaefer400 <- read.csv(paste(project_path,
+                                 'data/SArank_schaefer400_7Networks.csv',
                                  sep = ""))
 
 # sa.schaefer400 <- sa.schaefer400 %>% select(-X)
@@ -308,36 +335,36 @@ Anovapvaluesfdrs<-p.adjust(pvalues, method="BH")
 
 csvR2$anovaPvaluefdr <- Anovapvaluesfdrs
 csvR2$gamPvaluefdr <- GAMpvaluesfdrs
-outputPath <- paste(outpath, sprintf('csvFiles/%s_%s_r2.csv', dtype, gamtype), 
+outputPath <- paste(outpath, sprintf('csvFiles/%s_%s_r2.csv', dtype, gamtype),
                     sep="")
 write.csv(csvR2, outputPath, row.names=FALSE)
 
 # Effect size
 # histogram
-ggplot(gam.variable.schaefer, aes(x = GAM.variable.partialR2)) + 
-  geom_histogram(binwidth=.01, fill="darkcyan", color="#e9ecef", alpha=0.9) + 
+ggplot(gam.variable.schaefer, aes(x = GAM.variable.partialR2)) +
+  geom_histogram(binwidth=.01, fill="darkcyan", color="#e9ecef", alpha=0.9) +
   theme_bw()
 
-ggsave(filename = paste(outpath, sprintf('%s_%s_histogram_partialR2.svg', dtype, 
-                                         gamtype), 
-                        sep = ""), 
+ggsave(filename = paste(outpath, sprintf('%s_%s_histogram_partialR2.svg', dtype,
+                                         gamtype),
+                        sep = ""),
        dpi = 300, width = 3 , height = 2)
 
 # brain
 maxval <- max(abs(gam.variable.schaefer$GAM.variable.partialR2))
 
-ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400", 
-      mapping=aes(fill = GAM.variable.partialR2, colour=I("#e9ecef"), 
-                  size=I(.03)), position = c("stacked")) + 
-  theme_void() + 
-  paletteer::scale_fill_paletteer_c("pals::warmcool", 
-                                    na.value="transparent", direction = -1, 
-                                    limits = c(-maxval, maxval), 
+ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+      mapping=aes(fill = GAM.variable.partialR2, colour=I("#e9ecef"),
+                  size=I(.03)), position = c("stacked")) +
+  theme_void() +
+  paletteer::scale_fill_paletteer_c("pals::warmcool",
+                                    na.value="transparent", direction = -1,
+                                    limits = c(-maxval, maxval),
                                     oob = squish)
 
-ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_partialR2.svg', dtype, 
-                                         gamtype), 
-                        sep = ""), 
+ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_partialR2.svg', dtype,
+                                         gamtype),
+                        sep = ""),
        dpi = 300, width = 3 , height = 2)
 
 # ranks
@@ -354,18 +381,18 @@ gam.variable.schaefer$GAM.variable.rankR2 <- gam.variable.schaefer$GAM.variable.
 maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankR2))
 
 # brain ranks
-ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400", 
-      mapping=aes(fill = GAM.variable.rankR2, colour=I("#e9ecef"), size=I(.03)), 
-      position = c("stacked")) + theme_void() + 
-  paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent", 
-                                    direction = -1, 
-                                    limits = c(-maxval, maxval), 
-                                    oob = squish) 
+ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+      mapping=aes(fill = GAM.variable.rankR2, colour=I("#e9ecef"), size=I(.03)),
+      position = c("stacked")) + theme_void() +
+  paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent",
+                                    direction = -1,
+                                    limits = c(-maxval, maxval),
+                                    oob = squish)
 
 
-ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_rank_partialR2.svg', 
-                                         dtype, gamtype), 
-                        sep = ""), 
+ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_rank_partialR2.svg',
+                                         dtype, gamtype),
+                        sep = ""),
        dpi = 300, width = 3 , height = 2)
 
 # brain pvalues
@@ -377,19 +404,19 @@ Anovasignumber = sum(pvaluesfdrs < 0.05, na.rm=TRUE)
 pvaluesfdrs[pvaluesfdrs >= 0.05] <- NA
 gam.variable.schaefer$Anova.variable.pvaluefdr <- pvaluesfdrs
 
-ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400", 
-      mapping=aes(fill = Anova.variable.pvaluefdr, colour=I("#e9ecef"), size=I(.03)), 
+ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+      mapping=aes(fill = Anova.variable.pvaluefdr, colour=I("#e9ecef"), size=I(.03)),
       position = c("stacked")) + theme_void() + ggtitle(Anovasignumber) +
-  paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent", 
-                                    direction = -1, 
-                                    limits = c(0, 0.05), 
-                                    # limits = c(min(metric.regional.statistics$GAM.smooth.pvalue), 
-                                    #            max(metric.regional.statistics$GAM.smooth.pvalue)), 
-                                    oob = squish) 
+  paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent",
+                                    direction = -1,
+                                    limits = c(0, 0.05),
+                                    # limits = c(min(metric.regional.statistics$GAM.smooth.pvalue),
+                                    #            max(metric.regional.statistics$GAM.smooth.pvalue)),
+                                    oob = squish)
 
-ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_pval_partialR2.svg', 
-                                         dtype, gamtype), 
-                        sep = ""), 
+ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_pval_partialR2.svg',
+                                         dtype, gamtype),
+                        sep = ""),
        dpi = 300, width = 3 , height = 2)
 
 # significant ranks
@@ -402,36 +429,42 @@ gam.variable.schaefer$GAM.variable.rankR2sig <- rankR2sig
 maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankR2sig), na.rm=T)
 
 # brain significant ranks
-ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400", 
-      mapping=aes(fill = GAM.variable.rankR2sig, colour=I("#e9ecef"), size=I(.03)), 
+ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+      mapping=aes(fill = GAM.variable.rankR2sig, colour=I("#e9ecef"), size=I(.03)),
       position = c("stacked")) + theme_void() + ggtitle(Anovasignumber) +
-  paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent", 
-                                    direction = -1, 
-                                    limits = c(-maxval, maxval), 
-                                    oob = squish) 
+  paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent",
+                                    direction = -1,
+                                    limits = c(-maxval, maxval),
+                                    oob = squish)
 
-ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_ranksig_partialR2.svg', 
-                                         dtype, gamtype), 
-                        sep = ""), 
+ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_ranksig_partialR2.svg',
+                                         dtype, gamtype),
+                        sep = ""),
        dpi = 300, width = 3 , height = 2)
 }
 
 ###############################
+# Section 3: Study-Specific Analyses
 # Fit a gam for each study
 ###############################
+# Iterate over each study (bhrc, ccnp, hbn, nki, pnc)
+# Load data and re-fit GAMs on the same cortical metric
+# Visualize predicted smooths overlaid for each study
+# Save visualizations as SVG plots
+
 # study-specific fits
 data_labels <- c('bhrc', 'ccnp', 'hbn', 'nki', 'pnc') %>% as.data.frame() %>% set_names("data")
 
 b=ggplot()
-for(row in c(1:nrow(data_labels))){ 
+for(row in c(1:nrow(data_labels))){
   dataset <- data_labels$data[row]
   if(dataset=='bhrc'){ribboncolor <- '#F8766D'}
   if(dataset=='ccnp'){ribboncolor <- '#A3A500'}
   if(dataset=='hbn'){ribboncolor <- '#00BF7D'}
   if(dataset=='nki'){ribboncolor <- '#00B0F6'}
   if(dataset=='pnc'){ribboncolor <- '#E76BF3'}
-  
-  
+
+
   if (gamtype == 'age'){
     dtype <- sprintf('%s_df_%s_%s', dataset, metric, qc_version)
     outlabel <- sprintf('df_%s_%s', metric, qc_version)
@@ -448,23 +481,23 @@ for(row in c(1:nrow(data_labels))){
       outlabel <- sprintf('df_%s_%s_pfactor_filter_harmonized', metric, qc_version)
     }
   }
-  
+
   if (gamtype == 'age'){smooth_var <- 'age'}
   if (gamtype == 'age'){covars <- 'sex + euler'}
-  
+
   if (gamtype == 'pfactor'){smooth_var <- 'age'}
   if (gamtype == 'pfactor'){covars <- 'sex + euler'}
   if (gamtype == 'pfactor'){linear_var <- 'p_factor_mcelroy_harmonized_all_samples'}
-  
+
   # prepare data for GAMs
   metric.schaefer400.all <- read.csv(paste(data_path, sprintf('%s.tsv', dtype),
-                                           sep = ""), 
+                                           sep = ""),
                                      sep = '\t')
   # will use dataframe as a covariate
   metric.schaefer400.all$dataset <- as.factor(metric.schaefer400.all$study)
   # will use sex as a covariate
   metric.schaefer400.all$sex <- as.factor(metric.schaefer400.all$sex)
-  
+
   if (controlformean == TRUE){
     if (harmonized == TRUE){
       meanmapcovar <- metric.schaefer400.all$meanValHarmonized
@@ -473,21 +506,21 @@ for(row in c(1:nrow(data_labels))){
       meanmapcovar <- metric.schaefer400.all$meanVal
       covars <- 'sex + euler + meanmapcovar'}
   }
-  
+
   if (gamtype == 'pfactor'){
     # fit gam and get fitted lines
-    ctx.predicted.metric <- gam.linear.predict(measure = 'metric', 
+    ctx.predicted.metric <- gam.linear.predict(measure = 'metric',
                                                atlas = 'schaefer400',
-                                               dataset = 'all', 
+                                               dataset = 'all',
                                                region = corticalmap,
-                                               smooth_var = smooth_var, 
+                                               smooth_var = smooth_var,
                                                linear_var = linear_var,
                                                covariates = covars,
-                                               knots = 3, set_fx = FALSE, 
+                                               knots = 3, set_fx = FALSE,
                                                increments = 200)
     # get predicted.smooth df from function output
     ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-    
+
     # for p-factor
     if(metric == 'ct'){
       lolim <- 2.0
@@ -505,7 +538,7 @@ for(row in c(1:nrow(data_labels))){
       lolim <- 2.0
       hilim <- 4.0
     } # lgi
-    
+
     b <- b +
       geom_ribbon(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples,
                                                    y = .fitted, ymin = .lower_ci, ymax = .upper_ci),
@@ -523,20 +556,20 @@ for(row in c(1:nrow(data_labels))){
       scale_x_continuous(breaks=c(-2, -1, 0, 1, 2, 3), limits=c(-2, 3), expand = c(0.05,.05)) +
       ylim(lolim, hilim)
   }
-  
+
   if (gamtype == 'age'){
     # fit gam and get fitted lines
-    ctx.predicted.metric <- gam.smooth.predict(measure = 'metric', 
+    ctx.predicted.metric <- gam.smooth.predict(measure = 'metric',
                                                atlas = 'schaefer400',
-                                               dataset = 'all', 
+                                               dataset = 'all',
                                                region = corticalmap,
-                                               smooth_var = smooth_var, 
+                                               smooth_var = smooth_var,
                                                covariates = covars,
-                                               knots = 3, set_fx = FALSE, 
+                                               knots = 3, set_fx = FALSE,
                                                increments = 200)
     # get predicted.smooth df from function output
     ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-    
+
     # plot age
     if(metric == 'ct'){
       lolim <- 2.0
@@ -554,7 +587,7 @@ for(row in c(1:nrow(data_labels))){
       lolim <- 2.0
       hilim <- 4.0
     } # lgi
-    
+
     b <- b +
       geom_ribbon(data = ctx.predicted.metric, aes(x = age,
                                                    y = .fitted, ymin = .lower_ci, ymax = .upper_ci),
@@ -572,7 +605,7 @@ for(row in c(1:nrow(data_labels))){
       scale_x_continuous(breaks=c(6, 8, 10, 12, 14, 16, 18, 20, 22), limits = c(6,22), expand = c(0.05,.05)) +
       ylim(lolim, hilim)
   }
-  
+
 }
 print(b)
 

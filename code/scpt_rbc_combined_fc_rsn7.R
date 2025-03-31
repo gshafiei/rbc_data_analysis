@@ -1,6 +1,6 @@
 
 rm(list = ls())
-
+# Load libraries and helper functions
 library(stringr)
 library(tidyr)
 library(mgcv)
@@ -17,6 +17,7 @@ library(scales)
 
 source("/Users/gshafiei/Desktop/RBC/code/func_GAM_rbc.R")
 
+# Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
 data_path <- paste(project_path, 'data/dataR/', sep = "")
 outpath <- paste(project_path, 'results/function/', sep = "")
@@ -25,29 +26,33 @@ outpath <- paste(project_path, 'results/function/', sep = "")
 # combined_df_withinbetween_fcrsn7_noqc_pfactor_filter
 # combined_df_withinbetween_fcrsn7_artifact_pfactor_filter
 # combined_df_withinbetween_fcrsn7_artifact_pfactor_filter_harmonized
-# 
+#
 # # for age
 # combined_df_withinbetween_fcrsn7_noqc
 # combined_df_withinbetween_fcrsn7_artifact
 # combined_df_withinbetween_fcrsn7_artifact_harmonized
 
-dataset <- 'combined'
-qc_version <- 'artifact' # 'artifact' or 'noqc'
-gamtype <- 'pfactor' # 'age' or 'pfactor'
-harmonized <- TRUE
+# Define modeling parameters
+dataset <- 'combined' # combined data across studies
+qc_version <- 'artifact' # can be 'artifact' or 'noqc'
+gamtype <- 'pfactor' # can be 'age' or 'pfactor'
+harmonized <- TRUE # whether to use harmonized data
 
+# Dynamically build filename for the dataset based on flags
+# Selects appropriate TSV input depending on predictors and harmonization status
+# Output: dtype (dataset label string)
 if (gamtype == 'age'){
-  dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s', dataset, 
+  dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s', dataset,
                    qc_version)
   if (harmonized == TRUE){
     dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_harmonized', dataset, qc_version)
   }
 }
 if (gamtype == 'pfactor'){
-  dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter', dataset, 
+  dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter', dataset,
                    qc_version)
   if (harmonized == TRUE){
-    dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized', 
+    dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized',
                      dataset, qc_version)
   }
 }
@@ -59,10 +64,11 @@ if (gamtype == 'pfactor'){smooth_var <- 'age'}
 if (gamtype == 'pfactor'){covars <- 'sex + medianFD'}
 if (gamtype == 'pfactor'){linear_var <- 'p_factor_mcelroy_harmonized_all_samples'}
 
-# prepare data for GAMs
-netpair.schaefer400.all <- read.csv(paste(data_path, 
-                                          sprintf('%s.tsv', dtype), 
-                                          sep = ""), 
+# Load and prepare the dataset for GAMs
+# Schaefer-400 parcellation -- functional connectivity data
+netpair.schaefer400.all <- read.csv(paste(data_path,
+                                          sprintf('%s.tsv', dtype),
+                                          sep = ""),
                                     sep = '\t')
 
 # will use dataframe as a covariate
@@ -71,11 +77,18 @@ netpair.schaefer400.all$dataset <- as.factor(netpair.schaefer400.all$study)
 netpair.schaefer400.all$sex <- as.factor(netpair.schaefer400.all$sex)
 
 ##############################
-# Fit GAMs for Network Pairs #
+# Section 1: GAM Model Fitting
+# Fit GAMs for Network Pairs
 ##############################
+# For each network pair (28 network pairs), fit GAMs using helper functions
+# gam.fit.smooth() for age-related analysis: age as smooth term
+# gam.fit.linear() for linear p-factor modeling
+# Save p-values, partial R2, and onset/peak values if age
+# Adjust p-values (FDR correction) and export result tables as CSV
+
 if(dataset == 'combined'){
 #### Run gam.fit.smooth in all networks: with k=3
-# #list of regions to run gam.fit.smooth function on below
+# # list of regions to run gam.fit.smooth function on below
 # netpair_labels <- colnames(netpair.schaefer400.all)[0:28]
 netpair_labels <- names(netpair.schaefer400.all[0:28]) %>% as.data.frame() %>% set_names("netpair")
 
@@ -87,13 +100,13 @@ if(gamtype == 'age'){
   for(row in c(1:nrow(netpair_labels))){
     netpair <- netpair_labels$netpair[row]
     #run the gam.fit.smooth function
-    GAM.RESULTS <- gam.fit.smooth(measure = "netpair", atlas = "schaefer400", 
-                                  dataset = "all", region = netpair, 
+    GAM.RESULTS <- gam.fit.smooth(measure = "netpair", atlas = "schaefer400",
+                                  dataset = "all", region = netpair,
                                   smooth_var = smooth_var, covariates = covars,
                                   knots = 3, set_fx = FALSE, stats_only = FALSE)
     #and append results to output df
     gam.age[row,] <- GAM.RESULTS}
-  
+
   gam.age <- as.data.frame(gam.age)
   colnames(gam.age) <- c("netpair","GAM.age.Fvalue","GAM.age.pvalue","GAM.age.partialR2",
                          "Anova.age.pvalue","age.onsetchange","age.peakchange",
@@ -102,22 +115,22 @@ if(gamtype == 'age'){
   pvalues = gam.age$GAM.age.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
   gam.age$GAM.age.pvaluefdr <- pvaluesfdrs
-  
+
   pvalues = gam.age$Anova.age.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
-  
+
   gam.age$Anova.age.pvaluefdr <- pvaluesfdrs
-  
+
   # make sure values are numerical
   cols = c(2:11)
-  gam.age[,cols] = apply(gam.age[,cols], 2, 
+  gam.age[,cols] = apply(gam.age[,cols], 2,
                          function(x) as.numeric(as.character(x)))
   write.csv(gam.age, paste(outpath,
-                           sprintf('csvFiles/%s_%s_statistics.csv', dtype, 
+                           sprintf('csvFiles/%s_%s_statistics.csv', dtype,
                                    gamtype),
                            sep = ""),
             row.names = F, quote = F)
-  
+
   rm(gam.age)
   gc()
   }
@@ -129,36 +142,36 @@ if(gamtype == 'pfactor'){
   for(row in c(1:nrow(netpair_labels))){
     netpair <- netpair_labels$netpair[row]
     #run the gam.fit.smooth function
-    GAM.RESULTS <- gam.fit.linear(measure = "netpair", atlas = "schaefer400", 
-                                  dataset = "all", region = netpair, 
-                                  linear_var = linear_var, 
-                                  smooth_var = smooth_var, 
+    GAM.RESULTS <- gam.fit.linear(measure = "netpair", atlas = "schaefer400",
+                                  dataset = "all", region = netpair,
+                                  linear_var = linear_var,
+                                  smooth_var = smooth_var,
                                   covariates = covars,
                                   knots = 3, set_fx = FALSE)
     #and append results to output df
     gam.pfactor[row,] <- GAM.RESULTS}
-  
+
   gam.pfactor <- as.data.frame(gam.pfactor)
   colnames(gam.pfactor) <- c("netpair","GAM.pfactor.Fvalue","GAM.pfactor.pvalue",
                              "GAM.pfactor.partialR2",
                              "Anova.pfactor.pvalue")
-  
+
   # pvalues
   pvalues = gam.pfactor$GAM.pfactor.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
   gam.pfactor$GAM.pfactor.pvaluefdr <- pvaluesfdrs
-  
+
   pvalues = gam.pfactor$Anova.pfactor.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
-  
+
   gam.pfactor$Anova.pfactor.pvaluefdr <- pvaluesfdrs
-  
+
   # make sure values are numerical
   cols = c(2:6)
-  gam.pfactor[,cols] = apply(gam.pfactor[,cols], 2, 
+  gam.pfactor[,cols] = apply(gam.pfactor[,cols], 2,
                              function(x) as.numeric(as.character(x)))
   write.csv(gam.pfactor, paste(outpath,
-                               sprintf('csvFiles/%s_%s_statistics.csv', 
+                               sprintf('csvFiles/%s_%s_statistics.csv',
                                        dtype, gamtype),
                                sep = ""),
             row.names = F, quote = F)
@@ -167,24 +180,28 @@ if(gamtype == 'pfactor'){
   }
 }
 ###############################
+# Section 2: Single Example Fits + Plot
 # Fit a gam for certain network pairs as examples
 ###############################
+# Fit and visualize GAM curve for one network pair (e.g., Default.Cont)
+# Generate ribbon plots and save to SVG using ggplot2
+
 #### PREDICT GAM SMOOTH FITTED VALUES ####
 withinrsn <- FALSE
 if(gamtype == 'pfactor'){
   networkpair <- 'Cont.Default'
-  ctx.predicted.metric <- gam.linear.predict(measure = 'netpair', 
+  ctx.predicted.metric <- gam.linear.predict(measure = 'netpair',
                                              atlas = 'schaefer400',
-                                             dataset = 'all', 
+                                             dataset = 'all',
                                              region = networkpair,
-                                             smooth_var = smooth_var, 
+                                             smooth_var = smooth_var,
                                              linear_var = linear_var,
                                              covariates = covars,
-                                             knots = 3, set_fx = FALSE, 
+                                             knots = 3, set_fx = FALSE,
                                              increments = 200)
   # get predicted.smooth df from function output
   ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-  
+
   # plot p-factor
   ggplot(data = netpair.schaefer400.all, aes(x = p_factor_mcelroy_harmonized_all_samples,
                                              y = Cont.Default)) +
@@ -205,7 +222,7 @@ if(gamtype == 'pfactor'){
     theme(aspect.ratio=1) +
     scale_x_continuous(breaks=c(-2, -1, 0, 1, 2, 3), limits=c(-2, 3), expand = c(0.05,.05)) +
     ylim(-0.25, 0.75) # between
-  
+
   ggsave(paste(outpath, sprintf('%s_%s_%s.svg', dtype, gamtype, networkpair), sep = ""),
          dpi = 300,
          plot = last_plot())
@@ -214,19 +231,19 @@ if(gamtype == 'pfactor'){
 if(gamtype == 'age'){
   if(withinrsn == TRUE){networkpair <- 'SalVentAttn.SalVentAttn'}
   else{networkpair <- 'Default.SalVentAttn'}
-  ctx.predicted.metric <- gam.smooth.predict(measure = 'netpair', 
+  ctx.predicted.metric <- gam.smooth.predict(measure = 'netpair',
                                              atlas = 'schaefer400',
-                                             dataset = 'all', 
+                                             dataset = 'all',
                                              region = networkpair,
-                                             smooth_var = smooth_var, 
+                                             smooth_var = smooth_var,
                                              covariates = covars,
-                                             knots = 3, set_fx = FALSE, 
+                                             knots = 3, set_fx = FALSE,
                                              increments = 200)
   # get predicted.smooth df from function output
   ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
 
   # plot
-  ggplot(data = netpair.schaefer400.all, aes(x = age, 
+  ggplot(data = netpair.schaefer400.all, aes(x = age,
                                              if (withinrsn == TRUE){y = SalVentAttn.SalVentAttn}
                                              else{y = Default.SalVentAttn})) +
     geom_point(aes(color = dataset), size = 2) + # color = "#115c25"
@@ -245,64 +262,70 @@ if(gamtype == 'age'){
     scale_x_continuous(breaks=c(6, 8, 10, 12, 14, 16, 18, 20, 22), limits = c(6,22), expand = c(0.05,.05)) +
     (if (withinrsn == TRUE){ylim(0.03, 0.8)}
      else{ylim(-0.40, 0.75)})
-  
+
   ggsave(paste(outpath, sprintf('%s_%s_%s.svg', dtype, gamtype, networkpair), sep = ""),
          dpi = 300,
          plot = last_plot())
 }
 
 ###############################
-# Fit a gam for certain network pairs as examples
+# Section 3: Study-Specific Fits
+# Fit study-specific gams for certain network pairs as examples
 ###############################
+# Iterate over studies (bhrc, ccnp, hbn, nki, pnc)
+# Fit and visualize GAM curves per study for selected network pair
+# Overlays multiple GAM fits in one ggplot object with colored ribbons
+# Saves multi-study ribbon plot as SVG
+
 # study-specific fits
 data_labels <- c('bhrc', 'ccnp', 'hbn', 'nki', 'pnc') %>% as.data.frame() %>% set_names("data")
 withinrsn <- FALSE
 
 b=ggplot()
-for(row in c(1:nrow(data_labels))){ 
+for(row in c(1:nrow(data_labels))){
   dataset <- data_labels$data[row]
   if(dataset=='bhrc'){ribboncolor <- '#F8766D'}
   if(dataset=='ccnp'){ribboncolor <- '#A3A500'}
   if(dataset=='hbn'){ribboncolor <- '#00BF7D'}
   if(dataset=='nki'){ribboncolor <- '#00B0F6'}
   if(dataset=='pnc'){ribboncolor <- '#E76BF3'}
-  
+
   if (gamtype == 'age'){
-    dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s', dataset, 
+    dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s', dataset,
                      qc_version)
     outlabel <- sprintf('df_withinbetween_fcrsn7_%s', qc_version)
     if (harmonized == TRUE){
-      dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_harmonized', 
+      dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_harmonized',
                        dataset, qc_version)
-      outlabel <- sprintf('df_withinbetween_fcrsn7_%s_harmonized', 
+      outlabel <- sprintf('df_withinbetween_fcrsn7_%s_harmonized',
                           qc_version)
     }
   }
   if (gamtype == 'pfactor'){
-    dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter', dataset, 
+    dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter', dataset,
                      qc_version)
     outlabel <- sprintf('df_withinbetween_fcrsn7_%s_pfactor_filter', qc_version)
     if (harmonized == TRUE){
-      dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized', 
+      dtype <- sprintf('%s_df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized',
                        dataset, qc_version)
-      outlabel <- sprintf('df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized', 
+      outlabel <- sprintf('df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized',
                           qc_version)
     }
   }
-  
+
   if (gamtype == 'age'){smooth_var <- 'age'}
   if (gamtype == 'age'){covars <- 'sex + medianFD'}
-  
+
   if (gamtype == 'pfactor'){smooth_var <- 'age'}
   if (gamtype == 'pfactor'){covars <- 'sex + medianFD'}
   if (gamtype == 'pfactor'){linear_var <- 'p_factor_mcelroy_harmonized_all_samples'}
 
   # prepare data for GAMs
-  netpair.schaefer400.all <- read.csv(paste(data_path, 
-                                            sprintf('%s.tsv', dtype), 
-                                            sep = ""), 
+  netpair.schaefer400.all <- read.csv(paste(data_path,
+                                            sprintf('%s.tsv', dtype),
+                                            sep = ""),
                                       sep = '\t')
-  
+
   # will use dataframe as a covariate
   netpair.schaefer400.all$dataset <- as.factor(netpair.schaefer400.all$study)
   # will use sex as a covariate
@@ -311,18 +334,18 @@ for(row in c(1:nrow(data_labels))){
   if (gamtype == 'pfactor'){
     # fit gam and get fitted lines
     networkpair <- 'Cont.Default'
-    ctx.predicted.metric <- gam.linear.predict(measure = 'netpair', 
+    ctx.predicted.metric <- gam.linear.predict(measure = 'netpair',
                                                atlas = 'schaefer400',
-                                               dataset = 'all', 
+                                               dataset = 'all',
                                                region = networkpair,
-                                               smooth_var = smooth_var, 
+                                               smooth_var = smooth_var,
                                                linear_var = linear_var,
                                                covariates = covars,
-                                               knots = 3, set_fx = FALSE, 
+                                               knots = 3, set_fx = FALSE,
                                                increments = 200)
     # get predicted.smooth df from function output
     ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-    
+
     b <- b +
       geom_ribbon(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples,
                                                    y = .fitted, ymin = .lower_ci, ymax = .upper_ci),
@@ -340,22 +363,22 @@ for(row in c(1:nrow(data_labels))){
       scale_x_continuous(breaks=c(-2, -1, 0, 1, 2, 3), limits=c(-2, 3), expand = c(0.05,.05)) +
       ylim(-0.25, 0.75) # between
   }
-  
+
   if (gamtype == 'age'){
     # fit gam and get fitted lines
     if(withinrsn == TRUE){networkpair <- 'SalVentAttn.SalVentAttn'}
     else{networkpair <- 'Default.SalVentAttn'}
-    ctx.predicted.metric <- gam.smooth.predict(measure = 'netpair', 
+    ctx.predicted.metric <- gam.smooth.predict(measure = 'netpair',
                                                atlas = 'schaefer400',
-                                               dataset = 'all', 
+                                               dataset = 'all',
                                                region = networkpair,
-                                               smooth_var = smooth_var, 
+                                               smooth_var = smooth_var,
                                                covariates = covars,
-                                               knots = 3, set_fx = FALSE, 
+                                               knots = 3, set_fx = FALSE,
                                                increments = 200)
     # get predicted.smooth df from function output
     ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
-    
+
     b <- b +
       geom_ribbon(data = ctx.predicted.metric, aes(x = age,
                                                    y = .fitted, ymin = .lower_ci, ymax = .upper_ci),
@@ -374,11 +397,10 @@ for(row in c(1:nrow(data_labels))){
       (if(withinrsn == TRUE){ylim(0.03, 0.8)}
       else{ylim(-0.40, 0.75)})
   }
-  
+
 }
 print(b)
 
 ggsave(paste(outpath, sprintf('studyfits_%s_%s_%s.svg', outlabel, gamtype, networkpair), sep = ""),
        dpi = 300,
        plot = last_plot())
-       
