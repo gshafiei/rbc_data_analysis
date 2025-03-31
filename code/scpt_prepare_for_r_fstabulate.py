@@ -27,9 +27,14 @@ for iDataset in dataset:
     subj_list = [iFile.split('/')[-1].split('_')[0].split('-')[1]
                  for iFile in fileNames]
 
+    # extract specific structural features from tabulated freesurfer data
+    # gray matter volume
     gv = []
+    # cortical thickness
     ct = []
+    # surface area
     sa = []
+    # mean pial lgi (not used in RBC paper)
     lgi = []
 
     for i, iFile in enumerate(fileNames):
@@ -41,6 +46,7 @@ for iDataset in dataset:
                                      ('StructName', 'GrayVol', 'ThickAvg',
                                       'SurfArea', 'Mean_piallgi')]
         schaefer400.reset_index(inplace=True, drop=True)
+        # find and drop medial wall
         medial_wall_idx = np.where(np.array(schaefer400['StructName']) ==
                                    'Background+FreeSurfer_Defined_Medial_Wall')
         medial_wall_idx = medial_wall_idx[0]
@@ -55,6 +61,7 @@ for iDataset in dataset:
         print('\nFile %i/%i done!' % (i, len(fileNames)))
 
     for iType in dtype:
+        # load demographics and qc data
         demogs = pd.read_csv(datapath + 'data/demogs/' +
                              'study-%s_desc-participants.tsv'
                              % iDataset.upper(),
@@ -87,6 +94,7 @@ for iDataset in dataset:
             df_metric['participant_id'] = subj_list
             df_metric['meanVal'] = np.mean(np.array(lgi), axis=1)
 
+        # if data is 'bhrc' or 'nki', only keep baseline scans
         if iDataset == 'bhrc':
             demogs_ses1 = demogs.query('session_id == 1')
             demogs_ses1.reset_index(inplace=True, drop=True)
@@ -151,6 +159,7 @@ for iDataset in dataset:
         #     df_qc.drop(np.array(all_nanidx), inplace=True)
         #     df_qc.reset_index(inplace=True, drop=True)
 
+        # extract data for age range 6-22 years old
         df_final = df_qc.copy()
         df_final = df_final.query('6 <= age <= 22')
         df_final.reset_index(inplace=True, drop=True)
@@ -214,7 +223,9 @@ for iType in dtype:
 ################
 # regenerate tsv files for harmonized data
 ################
-# load harmonized data and regenerate tsv
+# first harmonize combined data in R using "covbat.R"
+# then load harmonized data and regenerate tsv files for R for combined
+# harmonized data as well as study-specific harmonized data
 dtype = ['ct_artifact', 'gv_artifact', 'sa_artifact', 'lgi_artifact',
          'ct_artifact_pfactor_filter', 'gv_artifact_pfactor_filter',
          'sa_artifact_pfactor_filter', 'lgi_artifact_pfactor_filter']

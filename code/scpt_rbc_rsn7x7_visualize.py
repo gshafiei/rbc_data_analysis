@@ -24,7 +24,7 @@ def convert_pvalue_to_asterisks(pvalue):
 
 
 ####################################
-# age effects in intrinsic networks
+# age effects in intrinsic networks (matrix plot)
 ####################################
 metric = 'pfactor'
 

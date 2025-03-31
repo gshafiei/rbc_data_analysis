@@ -220,7 +220,9 @@ for iType in dtype:
 ################
 # regenerate tsv files for harmonized data
 ################
-# load harmonized data and regenerate tsv
+# first harmonize combined data in R using "covbat.R"
+# then load harmonized data and regenerate tsv files for R for combined
+# harmonized data as well as study-specific harmonized data
 dtype = ['withinbetween_fcrsn7_artifact',
          'withinbetween_fcrsn7_artifact_pfactor_filter']
 dataset = ['bhrc', 'ccnp', 'hbn', 'nki', 'pnc']
