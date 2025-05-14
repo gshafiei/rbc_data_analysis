@@ -21,7 +21,7 @@ source("/Users/gshafiei/Desktop/RBC/code/func_GAM_rbc.R")
 # Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
 data_path <- paste(project_path, 'data/dataR/', sep = "")
-outpath <- paste(project_path, 'results/structure/', sep = "")
+outpath <- paste(project_path, 'results/revision/structure/', sep = "")
 
 # # for pfactor
 # combined_df_ct_noqc_pfactor_filter
@@ -36,12 +36,12 @@ outpath <- paste(project_path, 'results/structure/', sep = "")
 # Define modeling parameters
 dataset <- 'combined' # combined data across studies
 qc_version <- 'artifact' # can be 'artifact' or 'noqc'
-gamtype <- 'pfactor' # can be 'age' or 'pfactor'
+gamtype <- 'age' # can be 'age' or 'pfactor'
 harmonized <- TRUE # whether to use harmonized data
 controlformean <- FALSE # whether to include mean map as covariate
 
 # Metric of interest (e.g., 'ct', 'sa', 'gv', 'lgi') and associated map
-metric <- 'lgi'
+metric <- 'ct'
 corticalmap <- 'meanVal'
 
 # Dynamically build filename for the dataset based on flags
@@ -612,3 +612,140 @@ print(b)
 ggsave(paste(outpath, sprintf('studyfits_%s_%s.svg', outlabel, gamtype), sep = ""),
        dpi = 300,
        plot = last_plot())
+
+###############################
+# Section 4: Site-Specific Analyses
+# Updated with unique study_site labels from metric.schaefer400.all
+###############################
+# Iterate over each site
+# Load data and re-fit GAMs on the same cortical metric
+# Visualize predicted smooths overlaid for each study
+# Save visualizations as SVG plots
+
+# Define study sites and corresponding ribbon colors
+study_site <- c(
+  'PNC1'        = '#D11141',  # bright red
+  'HBNsiteSI'   = '#00B159',  # bright green
+  'HBNsiteRU'   = '#00AEDB',  # cyan
+  'HBNsiteCBIC' = '#F37735',  # orange
+  'HBNsiteCUNY' = '#FFC425',  # yellow
+  'BHRC-1'      = '#8C564B',  # brown
+  'BHRC-2'      = '#6A1B9A',  # purple
+  'NKI'         = '#1F77B4',  # blue
+  'Colornest'   = '#E377C2'   # pink
+)
+
+# Load combined dataset
+if (gamtype == 'age') {
+  dtype <- sprintf('combined_df_%s_%s', metric, qc_version)
+  outlabel <- sprintf('df_%s_%s', metric, qc_version)
+  if (harmonized == TRUE) {
+    dtype <- sprintf('combined_df_%s_%s_harmonized', metric, qc_version)
+    outlabel <- sprintf('df_%s_%s_harmonized', metric, qc_version)
+  }
+} else if (gamtype == 'pfactor') {
+  dtype <- sprintf('combined_df_%s_%s_pfactor_filter', metric, qc_version)
+  outlabel <- sprintf('df_%s_%s_pfactor_filter', metric, qc_version)
+  if (harmonized == TRUE) {
+    dtype <- sprintf('combined_df_%s_%s_pfactor_filter_harmonized', metric, qc_version)
+    outlabel <- sprintf('df_%s_%s_pfactor_filter_harmonized', metric, qc_version)
+  }
+}
+
+metric.schaefer400.all <- read.csv(paste(data_path, sprintf('%s.tsv', dtype), sep = ""), sep = '\t')
+metric.schaefer400.all$sex <- as.factor(metric.schaefer400.all$sex)
+metric.schaefer400.all$study_site <- as.factor(metric.schaefer400.all$study_site)
+
+# Loop through each study site
+b <- ggplot()
+for (dataset in names(study_site)) {
+  ribboncolor <- study_site[[dataset]]
+  sitemetric.schaefer400.all <- metric.schaefer400.all %>% dplyr::filter(study_site == dataset)
+  
+  if (gamtype == 'age') {
+    smooth_var <- 'age'
+    covars <- 'sex + euler'
+  } else if (gamtype == 'pfactor') {
+    smooth_var <- 'age'
+    covars <- 'sex + euler'
+    linear_var <- 'p_factor_mcelroy_harmonized_all_samples'
+  }
+  
+  if (controlformean == TRUE) {
+    if (harmonized == TRUE) {
+      meanmapcovar <- sitemetric.schaefer400.all$meanValHarmonized
+    } else {
+      meanmapcovar <- sitemetric.schaefer400.all$meanVal
+    }
+    covars <- 'sex + euler + meanmapcovar'
+  }
+  
+  if (gamtype == 'pfactor') {
+    ctx.predicted.metric <- gam.linear.predict(measure = 'sitemetric', 
+                                               atlas = 'schaefer400', 
+                                               dataset = 'all', 
+                                               region = corticalmap, 
+                                               smooth_var = smooth_var, 
+                                               linear_var = linear_var, 
+                                               covariates = covars, 
+                                               knots = 3, 
+                                               set_fx = FALSE, 
+                                               increments = 200)
+    ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
+    
+    if(metric == 'ct'){lolim <- 2.0; hilim <- 3.5}
+    if(metric == 'sa'){lolim <- 110; hilim <- 700}
+    if(metric == 'gv'){lolim <- 350; hilim <- 2200}
+    if(metric == 'lgi'){lolim <- 2.0; hilim <- 4.0}
+    
+    b <- b +
+      geom_ribbon(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples, 
+                                                   y = .fitted, ymin = .lower_ci, ymax = .upper_ci), 
+                  alpha = .3, linetype = 0, fill = ribboncolor) +
+      geom_line(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples, 
+                                                 y = .fitted), color = ribboncolor) +
+      labs(x='\npfactor', y=sprintf('%s\n', corticalmap)) +
+      theme_classic() +
+      theme(axis.text = element_text(size=12, family = "Arial", color = "black"),
+            axis.title.x = element_text(size=12, family ="Arial", color = "black"),
+            axis.title.y = element_text(size=12, family ="Arial", color = "black"),
+            legend.position="none",
+            aspect.ratio=1) +
+      scale_x_continuous(breaks=c(-2, -1, 0, 1, 2, 3), limits=c(-2, 3), expand = c(0.05,.05)) +
+      ylim(lolim, hilim)
+  }
+  
+  if (gamtype == 'age') {
+    ctx.predicted.metric <- gam.smooth.predict(measure = 'sitemetric',
+                                               atlas = 'schaefer400',
+                                               dataset = 'all',
+                                               region = corticalmap,
+                                               smooth_var = smooth_var,
+                                               covariates = covars,
+                                               knots = 3, set_fx = FALSE,
+                                               increments = 200)
+    ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
+    
+    if(metric == 'ct'){lolim <- 2.0; hilim <- 3.5}
+    if(metric == 'sa'){lolim <- 110; hilim <- 700}
+    if(metric == 'gv'){lolim <- 350; hilim <- 2200}
+    if(metric == 'lgi'){lolim <- 2.0; hilim <- 4.0}
+    
+    b <- b +
+      geom_ribbon(data = ctx.predicted.metric, aes(x = age, y = .fitted, ymin = .lower_ci, ymax = .upper_ci), 
+                  alpha = .3, linetype = 0, fill = ribboncolor) +
+      geom_line(data = ctx.predicted.metric, aes(x = age, y = .fitted), color = ribboncolor) +
+      labs(x='\nage', y=sprintf('%s\n', corticalmap)) +
+      theme_classic() +
+      theme(axis.text = element_text(size=12, family = "Arial", color = "black"),
+            axis.title.x = element_text(size=12, family ="Arial", color = "black"),
+            axis.title.y = element_text(size=12, family ="Arial", color = "black"),
+            legend.position="none",
+            aspect.ratio=1) +
+      scale_x_continuous(breaks=c(6, 8, 10, 12, 14, 16, 18, 20, 22), limits = c(6,22), expand = c(0.05,.05)) +
+      ylim(lolim, hilim)
+  }
+}
+
+print(b)
+ggsave(paste(outpath, sprintf('sitefits_%s_%s.svg', outlabel, gamtype), sep = ""), dpi = 300, plot = last_plot())

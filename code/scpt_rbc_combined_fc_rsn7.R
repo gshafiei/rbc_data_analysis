@@ -20,7 +20,7 @@ source("/Users/gshafiei/Desktop/RBC/code/func_GAM_rbc.R")
 # Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
 data_path <- paste(project_path, 'data/dataR/', sep = "")
-outpath <- paste(project_path, 'results/function/', sep = "")
+outpath <- paste(project_path, 'results/revision/function/', sep = "")
 
 # # for pfactor
 # combined_df_withinbetween_fcrsn7_noqc_pfactor_filter
@@ -404,3 +404,140 @@ print(b)
 ggsave(paste(outpath, sprintf('studyfits_%s_%s_%s.svg', outlabel, gamtype, networkpair), sep = ""),
        dpi = 300,
        plot = last_plot())
+
+###############################
+# Section 4: Site-Specific Analyses
+# Fit study-specific gams for certain network pairs as examples
+###############################
+# Iterate over studies (bhrc, ccnp, hbn, nki, pnc)
+# Fit and visualize GAM curves per study for selected network pair
+# Overlays multiple GAM fits in one ggplot object with colored ribbons
+# Saves multi-study ribbon plot as SVG
+
+# Define study sites and corresponding ribbon colors
+study_site <- c(
+  'PNC1'        = '#D11141',  # bright red
+  'HBNsiteSI'   = '#00B159',  # bright green
+  'HBNsiteRU'   = '#00AEDB',  # cyan
+  'HBNsiteCBIC' = '#F37735',  # orange
+  'HBNsiteCUNY' = '#FFC425',  # yellow
+  'BHRC-1'      = '#8C564B',  # brown
+  'BHRC-2'      = '#6A1B9A',  # purple
+  'NKI'         = '#1F77B4',  # blue
+  'Colornest'   = '#E377C2'   # pink
+)
+
+withinrsn <- FALSE
+
+# Load combined dataset
+if (gamtype == 'age') {
+  dtype <- sprintf('combined_df_withinbetween_fcrsn7_%s', qc_version)
+  outlabel <- sprintf('df_withinbetween_fcrsn7_%s', qc_version)
+  if (harmonized == TRUE) {
+    dtype <- sprintf('combined_df_withinbetween_fcrsn7_%s_harmonized', qc_version)
+    outlabel <- sprintf('df_withinbetween_fcrsn7_%s_harmonized', qc_version)
+  }
+} else if (gamtype == 'pfactor') {
+  dtype <- sprintf('combined_df_withinbetween_fcrsn7_%s_pfactor_filter', qc_version)
+  outlabel <- sprintf('df_withinbetween_fcrsn7_%s_pfactor_filter', qc_version)
+  if (harmonized == TRUE) {
+    dtype <- sprintf('combined_df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized', qc_version)
+    outlabel <- sprintf('df_withinbetween_fcrsn7_%s_pfactor_filter_harmonized',
+                        qc_version)
+  }
+}
+
+# prepare data for GAMs
+netpair.schaefer400.all <- read.csv(paste(data_path, sprintf('%s.tsv', dtype), sep = ""), sep = '\t')
+# will use dataframe as a covariate
+netpair.schaefer400.all$study_site <- as.factor(netpair.schaefer400.all$study_site)
+# will use sex as a covariate
+netpair.schaefer400.all$sex <- as.factor(netpair.schaefer400.all$sex)
+
+# Loop through each study site
+b <- ggplot()
+for (dataset in names(study_site)) {
+  ribboncolor <- study_site[[dataset]]
+  sitenetpair.schaefer400.all <- netpair.schaefer400.all %>% dplyr::filter(study_site == dataset)
+  
+  if (gamtype == 'age'){smooth_var <- 'age'}
+  if (gamtype == 'age'){covars <- 'sex + medianFD'}
+  
+  if (gamtype == 'pfactor'){smooth_var <- 'age'}
+  if (gamtype == 'pfactor'){covars <- 'sex + medianFD'}
+  if (gamtype == 'pfactor'){linear_var <- 'p_factor_mcelroy_harmonized_all_samples'}
+  
+  if (gamtype == 'pfactor'){
+    # fit gam and get fitted lines
+    networkpair <- 'Cont.Default'
+    ctx.predicted.metric <- gam.linear.predict(measure = 'sitenetpair',
+                                               atlas = 'schaefer400',
+                                               dataset = 'all',
+                                               region = networkpair,
+                                               smooth_var = smooth_var,
+                                               linear_var = linear_var,
+                                               covariates = covars,
+                                               knots = 3, set_fx = FALSE,
+                                               increments = 200)
+    # get predicted.smooth df from function output
+    ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
+    
+    b <- b +
+      geom_ribbon(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples,
+                                                   y = .fitted, ymin = .lower_ci, ymax = .upper_ci),
+                  alpha = .3, linetype = 0, fill = c(ribboncolor)) +
+      geom_line(data = ctx.predicted.metric, aes(x = p_factor_mcelroy_harmonized_all_samples,
+                                                 y = .fitted), color = c(ribboncolor)) +
+      labs(x='\npfactor', y=sprintf('%s\n', networkpair)) +
+      theme_classic() +
+      theme(
+        axis.text = element_text(size=12, family = "Arial", color = c("black")),
+        axis.title.x = element_text(size=12, family ="Arial", color = c("black")),
+        axis.title.y = element_text(size=12, family ="Arial", color = c("black"))) +
+      theme(legend.position="none") +
+      theme(aspect.ratio=1) +
+      scale_x_continuous(breaks=c(-2, -1, 0, 1, 2, 3), limits=c(-2, 3), expand = c(0.05,.05)) +
+      ylim(-0.25, 0.75) # between
+  }
+  
+  if (gamtype == 'age'){
+    # fit gam and get fitted lines
+    if(withinrsn == TRUE){networkpair <- 'SalVentAttn.SalVentAttn'}
+    else{networkpair <- 'Default.SalVentAttn'}
+    ctx.predicted.metric <- gam.smooth.predict(measure = 'sitenetpair',
+                                               atlas = 'schaefer400',
+                                               dataset = 'all',
+                                               region = networkpair,
+                                               smooth_var = smooth_var,
+                                               covariates = covars,
+                                               knots = 3, set_fx = FALSE,
+                                               increments = 200)
+    # get predicted.smooth df from function output
+    ctx.predicted.metric <- as.data.frame(ctx.predicted.metric[3])
+    
+    b <- b +
+      geom_ribbon(data = ctx.predicted.metric, aes(x = age,
+                                                   y = .fitted, ymin = .lower_ci, ymax = .upper_ci),
+                  alpha = .3, linetype = 0, fill = c(ribboncolor)) +
+      geom_line(data = ctx.predicted.metric, aes(x = age,
+                                                 y = .fitted), color = c(ribboncolor)) +
+      labs(x='\nage', y=sprintf('%s\n', networkpair)) +
+      theme_classic() +
+      theme(
+        axis.text = element_text(size=12, family = "Arial", color = c("black")),
+        axis.title.x = element_text(size=12, family ="Arial", color = c("black")),
+        axis.title.y = element_text(size=12, family ="Arial", color = c("black"))) +
+      theme(legend.position="none") +
+      theme(aspect.ratio=1) +
+      scale_x_continuous(breaks=c(6, 8, 10, 12, 14, 16, 18, 20, 22), limits = c(6,22), expand = c(0.05,.05)) +
+      (if(withinrsn == TRUE){ylim(0.03, 0.8)}
+       else{ylim(-0.40, 0.75)})
+  }
+  
+}
+print(b)
+
+ggsave(paste(outpath, sprintf('sitefits_%s_%s_%s.svg', outlabel, gamtype, networkpair), sep = ""),
+       dpi = 300,
+       plot = last_plot())
+ 
