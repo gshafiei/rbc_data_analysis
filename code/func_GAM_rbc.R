@@ -335,3 +335,110 @@ gam.linear.predict <- function(measure, atlas, dataset, region, smooth_var,
   return(linear.fit)
 }
 
+#########################################
+##### Functions added for revisions #####
+#########################################
+#### PREDICT GAM SMOOTH FITTED VALUES FOR A SPECIFIED VALUE OF AN INTERACTING COVARIATE ####
+## Function to predict fitted values of a measure for a given value of a covariate, 
+## using a varying coefficients smooth-by-linear covariate interaction
+gam.smooth.predict.covariateinteraction <- function(measure, atlas, dataset, 
+                                                    region, smooth_var, int_var, 
+                                                    int_var.predict, covariates, 
+                                                    knots, set_fx = FALSE, 
+                                                    increments)
+  {
+  #Fit the gam
+  dataname <- sprintf("%s.%s.%s", measure, atlas, dataset) 
+  gam.data <- get(dataname)
+  parcel <- region
+  region <- str_replace(region, "-", ".")
+  modelformula <- as.formula(sprintf("%1$s ~ s(%2$s, k = %3$s, fx = %4$s) + 
+                                     s(%2$s, by = %5$s, k = %3$s, fx = %4$s) + 
+                                     %6$s", region, smooth_var, knots, set_fx, 
+                                     int_var, covariates))
+  gam.model <- gam(modelformula, method = "REML", data=gam.data)
+  gam.results <- summary(gam.model)
+  
+  #Extract gam input data
+  #extract the data used to build the gam, i.e., a df of y + predictor values 
+  df <- gam.model$model
+  
+  #Create a prediction data frame
+  #number of predictions to make; predict at np increments of smooth_var
+  np <- increments 
+  #initiate a prediction df 
+  thisPred <- data.frame(init = rep(0,np))
+  
+  #gam model predictors (smooth_var + covariates)
+  theseVars <- attr(gam.model$terms,"term.labels")
+  #classes of the model predictors and y measure
+  varClasses <- attr(gam.model$terms,"dataClasses")
+  #the measure to predict
+  thisResp <- as.character(gam.model$terms[[2]]) 
+  #fill the prediction df with data for predictions. These data will be used 
+  # to predict the output measure (y) at np increments of the smooth_var, 
+  # holding other model terms constant
+  for (v in c(1:length(theseVars))) {
+    thisVar <- theseVars[[v]]
+    thisClass <- varClasses[thisVar]
+    #generate a range of np data points, from minimum of smooth term to maximum of smooth term
+    if (thisVar == smooth_var) { 
+      thisPred[,smooth_var] = seq(min(df[,smooth_var],na.rm = T),
+                                  max(df[,smooth_var],na.rm = T), 
+                                  length.out = np) 
+    } else {
+      switch (thisClass,
+              #make predictions based on median value
+              "numeric" = {thisPred[,thisVar] = median(df[,thisVar])},
+              #make predictions based on first level of factor 
+              "factor" = {thisPred[,thisVar] = levels(df[,thisVar])[[1]]},
+              #make predictions based on first level of ordinal variable
+              "ordered" = {thisPred[,thisVar] = levels(df[,thisVar])[[1]]}
+      )
+    }
+  }
+  pred <- thisPred %>% select(-init)
+  pred[, int_var] <- factor(
+    int_var.predict, 
+    levels = levels(df[[int_var]]), 
+    ordered = is.ordered(df[[int_var]])
+  )
+  
+  #Generate fitted (predicted) values based on the gam model and predication data frame
+  predicted.smooth <- fitted_values(object = gam.model, data = pred)
+  #subtract the intercept from fitted values
+  predicted.smooth$fitted.centered <- (predicted.smooth$.fitted-gam.results$p.table[1,1])
+  predicted.smooth <- predicted.smooth %>% select(all_of(smooth_var), .fitted, 
+                                                  .se, .lower_ci, .upper_ci, 
+                                                  fitted.centered)
+  
+  return(predicted.smooth)
+}
+
+
+#### FIT GAM FACTOR-SMOOTH INTERACTION #### 
+##Function to fit a GAM with a factor-smooth interaction and obtain statistics for the interaction term 
+gam.factorsmooth.interaction <- function(measure, atlas, dataset, region, 
+                                         smooth_var, int_var, covariates, 
+                                         knots, set_fx = FALSE)
+  {
+  #Fit the gam
+  dataname <- sprintf("%s.%s.%s", measure, atlas, dataset) 
+  gam.data <- get(dataname)
+  parcel <- region
+  region <- str_replace(region, "-", ".")
+  modelformula <- as.formula(sprintf("%1$s ~ s(%2$s, k = %3$s, fx = %4$s) + 
+                                     s(%2$s, by = %5$s, k = %3$s, fx = %4$s) + 
+                                     %6$s", region, smooth_var, knots, set_fx, 
+                                     int_var, covariates))
+  gam.model <- gam(modelformula, method = "REML", data = gam.data)
+  gam.results <- summary(gam.model)
+  
+  #GAM statistics
+  #F value for the smooth term and GAM-based significance of the smooth term
+  gam.int.F <- gam.results$s.table[2,3]
+  gam.int.pvalue <- gam.results$s.table[2,4]
+  
+  interaction.stats <- cbind(parcel, gam.int.F, gam.int.pvalue)
+  return(interaction.stats)
+}

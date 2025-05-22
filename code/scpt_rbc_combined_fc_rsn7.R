@@ -15,7 +15,7 @@ library(ggseg3d)
 library(ggplot2)
 library(scales)
 
-source("/Users/gshafiei/Desktop/RBC/code/func_GAM_rbc.R")
+source("/Users/gshafiei/Desktop/rbc_data_analysis/code/func_GAM_rbc.R")
 
 # Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
@@ -90,7 +90,8 @@ if(dataset == 'combined'){
 #### Run gam.fit.smooth in all networks: with k=3
 # # list of regions to run gam.fit.smooth function on below
 # netpair_labels <- colnames(netpair.schaefer400.all)[0:28]
-netpair_labels <- names(netpair.schaefer400.all[0:28]) %>% as.data.frame() %>% set_names("netpair")
+netpair_labels <- names(netpair.schaefer400.all[0:28]) %>% 
+  as.data.frame() %>% set_names("netpair")
 
 # network connectivity GAMs
 if(gamtype == 'age'){
@@ -137,7 +138,7 @@ if(gamtype == 'age'){
 
 if(gamtype == 'pfactor'){
   #empty matrix to save gam.fit output to
-  gam.pfactor <- matrix(data=NA, nrow=28, ncol=5)
+  gam.variable <- matrix(data=NA, nrow=28, ncol=5)
   #for each network pair
   for(row in c(1:nrow(netpair_labels))){
     netpair <- netpair_labels$netpair[row]
@@ -149,33 +150,32 @@ if(gamtype == 'pfactor'){
                                   covariates = covars,
                                   knots = 3, set_fx = FALSE)
     #and append results to output df
-    gam.pfactor[row,] <- GAM.RESULTS}
+    gam.variable[row,] <- GAM.RESULTS}
 
-  gam.pfactor <- as.data.frame(gam.pfactor)
-  colnames(gam.pfactor) <- c("netpair","GAM.pfactor.Fvalue","GAM.pfactor.pvalue",
-                             "GAM.pfactor.partialR2",
-                             "Anova.pfactor.pvalue")
+  gam.variable <- as.data.frame(gam.variable)
+  colnames(gam.variable) <- c("netpair","GAM.variable.Fvalue","GAM.variable.pvalue",
+                              "GAM.variable.partialR2",
+                              "Anova.pfactor.pvalue")
 
   # pvalues
-  pvalues = gam.pfactor$GAM.pfactor.pvalue
+  pvalues = gam.variable$GAM.variable.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
-  gam.pfactor$GAM.pfactor.pvaluefdr <- pvaluesfdrs
+  gam.variable$GAM.variable.pvaluefdr <- pvaluesfdrs
 
-  pvalues = gam.pfactor$Anova.pfactor.pvalue
+  pvalues = gam.variable$Anova.pfactor.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
-
-  gam.pfactor$Anova.pfactor.pvaluefdr <- pvaluesfdrs
+  gam.variable$Anova.pfactor.pvaluefdr <- pvaluesfdrs
 
   # make sure values are numerical
   cols = c(2:6)
-  gam.pfactor[,cols] = apply(gam.pfactor[,cols], 2,
-                             function(x) as.numeric(as.character(x)))
-  write.csv(gam.pfactor, paste(outpath,
-                               sprintf('csvFiles/%s_%s_statistics.csv',
-                                       dtype, gamtype),
-                               sep = ""),
+  gam.variable[,cols] = apply(gam.variable[,cols], 2,
+                              function(x) as.numeric(as.character(x)))
+  write.csv(gam.variable, paste(outpath,
+                                sprintf('csvFiles/%s_%s_statistics.csv',
+                                        dtype, gamtype),
+                                sep = ""),
             row.names = F, quote = F)
-  rm(gam.pfactor)
+  rm(gam.variable)
   gc()
   }
 }

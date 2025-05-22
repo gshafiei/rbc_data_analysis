@@ -38,8 +38,8 @@ elif metric == 'pfactor':
     dtype = ['noqc_pfactor_filter',
              'artifact_pfactor_filter',
              'artifact_pfactor_filter_harmonized']
-    effect_label = 'GAM.pfactor.partialR2'
-    pval_label = 'Anova.pfactor.pvaluefdr'
+    effect_label = 'GAM.variable.partialR2'
+    pval_label = 'Anova.variable.pvaluefdr'
 
 for iType in dtype:
     age_eff = pd.read_csv(datapath + 'results/function/csvFiles/' +

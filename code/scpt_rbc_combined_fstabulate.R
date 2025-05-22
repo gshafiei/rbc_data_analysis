@@ -16,7 +16,7 @@ library(ggseg3d)
 library(ggplot2)
 library(scales)
 
-source("/Users/gshafiei/Desktop/RBC/code/func_GAM_rbc.R")
+source("/Users/gshafiei/Desktop/rbc_data_analysis/code/func_GAM_rbc.R")
 
 # Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
@@ -367,18 +367,49 @@ ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_partialR2.svg', dtype,
                         sep = ""),
        dpi = 300, width = 3 , height = 2)
 
-# ranks
-rankR2 = rank(gam.variable.schaefer$GAM.variable.partialR2, ties.method = c("average"))
-gam.variable.schaefer$GAM.variable.rankR2 <- rankR2
+# # ranks
+# rankR2 = rank(gam.variable.schaefer$GAM.variable.partialR2, ties.method = c("average"))
+# gam.variable.schaefer$GAM.variable.rankR2 <- rankR2
+# 
+# nearestNeg <- max(gam.variable.schaefer$GAM.variable.partialR2[gam.variable.schaefer$GAM.variable.partialR2<0])
+# nearestNegIdx <- which(gam.variable.schaefer$GAM.variable.partialR2 == nearestNeg)
+# 
+# nearestNegRank <- gam.variable.schaefer$GAM.variable.rankR2[nearestNegIdx]
+# 
+# gam.variable.schaefer$GAM.variable.rankR2 <- gam.variable.schaefer$GAM.variable.rankR2-(nearestNegRank+1)
+# 
+# maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankR2))
 
-nearestNeg <- max(gam.variable.schaefer$GAM.variable.partialR2[gam.variable.schaefer$GAM.variable.partialR2<0])
-nearestNegIdx <- which(gam.variable.schaefer$GAM.variable.partialR2 == nearestNeg)
+# Replace GAM.variable.partialR2 with ranks robustly
+# (1) Rank the partial R2 values
+gam.variable.schaefer$GAM.variable.rankR2 <- rank(
+  gam.variable.schaefer$GAM.variable.partialR2, 
+  ties.method = "average"
+)
 
-nearestNegRank <- gam.variable.schaefer$GAM.variable.rankR2[nearestNegIdx]
+# (2) Find the nearest negative value, if it exists
+neg_vals <- gam.variable.schaefer$GAM.variable.partialR2[
+  gam.variable.schaefer$GAM.variable.partialR2 < 0
+]
 
-gam.variable.schaefer$GAM.variable.rankR2 <- gam.variable.schaefer$GAM.variable.rankR2-(nearestNegRank+1)
+if (length(neg_vals) > 0) {
+  # (3) Center ranks around the largest negative value (i.e., nearest to 0)
+  nearestNeg <- max(neg_vals)
+  nearestNegIdx <- which(gam.variable.schaefer$GAM.variable.partialR2 == nearestNeg)
+  nearestNegRank <- gam.variable.schaefer$GAM.variable.rankR2[nearestNegIdx]
+  
+  gam.variable.schaefer$GAM.variable.rankR2 <- 
+    gam.variable.schaefer$GAM.variable.rankR2 - (nearestNegRank + 1)
+  
+  centered <- TRUE
+} else {
+  # No negatives — do not shift the ranks
+  centered <- FALSE
+}
 
-maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankR2))
+# (4) Max absolute value (for plotting scale)
+maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankR2), na.rm = TRUE)
+
 
 # brain ranks
 ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
