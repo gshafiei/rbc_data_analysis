@@ -96,7 +96,7 @@ for iType in dtype:
     ax.figure.set_figheight(6)  # 4  6 4
     plt.tight_layout()
     plt.show()
-    plt.savefig(datapath + 'results/revision/sex/function/' +
+    plt.savefig(datapath + 'results/function/' +
                 'combined_df_withinbetween_fcrsn7_' +
                 '%s_%s_statistics_asterisk.svg'
                 % (iType, metric),
