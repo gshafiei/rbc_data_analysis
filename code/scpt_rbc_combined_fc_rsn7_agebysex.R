@@ -57,11 +57,11 @@ netpair.schaefer400.all$sex <- as.factor(netpair.schaefer400.all$sex)
 
 # Filter out rows where sex is not "female" or "male"
 netpair.schaefer400.all <- netpair.schaefer400.all %>%
-  filter(sex %in% c("Female", "Male"))
+  filter(sex %in% c("Male", "Female"))
 
 # ordered
 netpair.schaefer400.all$oSex <- factor(netpair.schaefer400.all$sex,
-                                       levels = c("Female", "Male"),
+                                       levels = c("Male", "Female"),
                                        ordered = TRUE)
 
 smooth_var <- 'age'
@@ -122,3 +122,74 @@ if(dataset == 'combined'){
   rm(gam.variable)
   gc()
 }
+
+###############################
+# Section 2: Single Example Fits + Plot
+# Fit a gam for certain network pairs as examples
+###############################
+# Fit and visualize GAM curve for one network pair (e.g., Default.Cont)
+# Generate ribbon plots and save to SVG using ggplot2
+withinrsn <- FALSE
+#### PREDICT GAM SMOOTH FITTED VALUES ####
+if(withinrsn == TRUE){
+  networkpair <- 'Cont.Cont'
+  } else{networkpair <- 'Cont.Default'} # SalVentAttn.Vis
+
+# predict smooth fitted values for 'Female'
+ctx.predicted.metric.F <- gam.smooth.predict.covariateinteraction(measure = 'netpair',
+                                                                  atlas = 'schaefer400',
+                                                                  dataset = 'all',
+                                                                  region = networkpair,
+                                                                  smooth_var = smooth_var,
+                                                                  int_var = model_var,
+                                                                  int_var.predict = 'Female',
+                                                                  covariates = covars,
+                                                                  knots = 3, 
+                                                                  set_fx = FALSE,
+                                                                  increments = 200)
+ctx.predicted.metric.F$sex <- 'Female'
+
+# predict smooth fitted values for 'Male'
+ctx.predicted.metric.M <- gam.smooth.predict.covariateinteraction(measure = 'netpair',
+                                                                  atlas = 'schaefer400',
+                                                                  dataset = 'all',
+                                                                  region = networkpair,
+                                                                  smooth_var = smooth_var,
+                                                                  int_var = model_var,
+                                                                  int_var.predict = 'Male',
+                                                                  covariates = covars,
+                                                                  knots = 3, 
+                                                                  set_fx = FALSE,
+                                                                  increments = 200)
+ctx.predicted.metric.M$sex <- 'Male'
+
+# combine
+ctx.predicted.metric <- bind_rows(ctx.predicted.metric.F, ctx.predicted.metric.M)
+
+
+# plot
+ggplot(data = netpair.schaefer400.all, aes(x = age,
+                                           if (withinrsn == TRUE){y = Cont.Cont}
+                                           else{y = Cont.Default})) +
+  geom_point(aes(color = sex), alpha = 0.25, size = 1) +
+  geom_ribbon(data = ctx.predicted.metric, 
+              aes(x = age, y = .fitted, ymin = .lower_ci, ymax = .upper_ci, fill = sex), 
+              alpha = 0.5, inherit.aes = FALSE) +
+  geom_line(data = ctx.predicted.metric, 
+            aes(x = age, y = .fitted, color = sex), 
+            size = 1.2, inherit.aes = FALSE) +
+  labs(x='\nage', y=sprintf('%s\n', networkpair)) +
+  theme_classic() +
+  theme(
+    axis.text = element_text(size=12, family = "Arial", color = c("black")),
+    axis.title.x = element_text(size=12, family ="Arial", color = c("black")),
+    axis.title.y = element_text(size=12, family ="Arial", color = c("black"))) +
+  theme(legend.position="none") +
+  theme(aspect.ratio=1) +
+  scale_x_continuous(breaks=c(6, 8, 10, 12, 14, 16, 18, 20, 22), limits = c(6,22), expand = c(0.05,.05)) +
+  (if (withinrsn == TRUE){ylim(0.03, 0.8)}
+   else{ylim(-0.40, 0.75)})
+
+ggsave(paste(outpath, sprintf('%s_%s_%s.svg', dtype, gamtype, networkpair), sep = ""),
+       dpi = 300,
+       plot = last_plot())

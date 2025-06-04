@@ -21,7 +21,7 @@ source("/Users/gshafiei/Desktop/rbc_data_analysis/code/func_GAM_rbc.R")
 # Set paths
 project_path <- '/Users/gshafiei/Desktop/RBC/'
 data_path <- paste(project_path, 'data/dataR/', sep = "")
-outpath <- paste(project_path, 'results/revision/sex/structure/', sep = "")
+outpath <- paste(project_path, 'results/revision/sex/structure/control_for_meanORtiv/', sep = "")
 
 # # file names
 # combined_df_ct_noqc
@@ -33,9 +33,11 @@ dataset <- 'combined' # combined data across studies
 qc_version <- 'artifact' # can be 'artifact' or 'noqc'
 gamtype <- 'sex'
 harmonized <- TRUE # whether to use harmonized data
+controlformean <- FALSE # whether to include mean map as covariate
+controlforTIV <- TRUE # whether to include mean map as covariate
 
 # Metric of interest (e.g., 'ct', 'sa', 'gv', 'lgi') and associated map
-metric <- 'gv'
+metric <- 'sa'
 corticalmap <- 'meanVal'
 
 # Dynamically build filename for the dataset based on flags
@@ -46,6 +48,10 @@ if (harmonized == TRUE){corticalmap <- 'meanValHarmonized'}
 dtype <- sprintf('%s_df_%s_%s', dataset, metric, qc_version)
 if (harmonized == TRUE){
   dtype <- sprintf('%s_df_%s_%s_harmonized', dataset, metric, qc_version)
+}
+
+if (controlforTIV == TRUE){
+  dtype <- sprintf('%s_eTIV', dtype)
 }
 
 # Load and prepare the dataset for GAMs
@@ -63,19 +69,33 @@ metric.schaefer400.all$sex <- as.factor(metric.schaefer400.all$sex)
 
 # Filter out rows where sex is not "female" or "male"
 metric.schaefer400.all <- metric.schaefer400.all %>%
-  filter(sex %in% c("Female", "Male"))
+  filter(sex %in% c("Male", "Female"))
 
 metric.schaefer400.all$sex <- factor(metric.schaefer400.all$sex, 
-                                     levels = c("Female", "Male"), 
+                                     levels = c("Male", "Female"), 
                                      ordered = FALSE)
 
 # # ordered
 # metric.schaefer400.all$oSex <- factor(metric.schaefer400.all$sex,
-#                                      levels = c("Female", "Male"),
+#                                      levels = c("Male", "Female"),
 #                                      ordered = TRUE)
 
+# If enabled, adjust covariates to control for mean cortical value
+if (controlformean == TRUE){
+  if (harmonized == TRUE){
+    meanmapcovar <- metric.schaefer400.all$meanValHarmonized
+    covars <- 'euler + meanmapcovar'}
+  else if (harmonized == FALSE){
+    meanmapcovar <- metric.schaefer400.all$meanVal
+    covars <- 'euler + meanmapcovar'}
+} else if (controlforTIV == TRUE){
+  tivmapcovar <- metric.schaefer400.all$eTIV
+  covars <- 'euler + tivmapcovar'
+} else if (controlformean == FALSE && controlforTIV == FALSE){
+  covars <- 'euler'
+}
+
 smooth_var <- 'age'
-covars <- 'euler'
 # in this analysis, ordered sex or categorical sex (unordered) will give 
 # identical results (because i only have 2 levels)
 model_var <- 'sex'

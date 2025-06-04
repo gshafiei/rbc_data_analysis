@@ -33,9 +33,11 @@ dataset <- 'combined' # combined data across studies
 qc_version <- 'artifact' # can be 'artifact' or 'noqc'
 gamtype <- 'agebysex'
 harmonized <- TRUE # whether to use harmonized data
+controlformean <- FALSE # whether to include mean map as covariate
+controlforTIV <- FALSE # whether to include mean map as covariate
 
 # Metric of interest (e.g., 'ct', 'sa', 'gv', 'lgi') and associated map
-metric <- 'sa'
+metric <- 'ct'
 corticalmap <- 'meanVal'
 
 # Dynamically build filename for the dataset based on flags
@@ -46,6 +48,10 @@ if (harmonized == TRUE){corticalmap <- 'meanValHarmonized'}
 dtype <- sprintf('%s_df_%s_%s', dataset, metric, qc_version)
 if (harmonized == TRUE){
   dtype <- sprintf('%s_df_%s_%s_harmonized', dataset, metric, qc_version)
+}
+
+if (controlforTIV == TRUE){
+  dtype <- sprintf('%s_eTIV', dtype)
 }
 
 # Load and prepare the dataset for GAMs
@@ -63,14 +69,27 @@ metric.schaefer400.all$sex <- as.factor(metric.schaefer400.all$sex)
 
 # Filter out rows where sex is not "female" or "male"
 metric.schaefer400.all <- metric.schaefer400.all %>%
-  filter(sex %in% c("Female", "Male"))
+  filter(sex %in% c("Male", "Female"))
 
 metric.schaefer400.all$oSex <- factor(metric.schaefer400.all$sex, 
-                                     levels = c("Female", "Male"), 
+                                     levels = c("Male", "Female"), 
                                      ordered = TRUE)
 
+if (controlformean == TRUE){
+  if (harmonized == TRUE){
+    meanmapcovar <- metric.schaefer400.all$meanValHarmonized
+    covars <- 'oSex + euler + meanmapcovar'}
+  else if (harmonized == FALSE){
+    meanmapcovar <- metric.schaefer400.all$meanVal
+    covars <- 'oSex + euler + meanmapcovar'}
+} else if (controlforTIV == TRUE){
+  tivmapcovar <- metric.schaefer400.all$eTIV
+  covars <- 'euler + tivmapcovar'
+} else if (controlformean == FALSE && controlforTIV == FALSE){
+  covars <- 'oSex + euler'
+}
+
 smooth_var <- 'age'
-covars <- 'oSex + euler'
 model_var <- 'oSex'
 
 ###############################
@@ -176,3 +195,190 @@ ggsave(paste(outpath, sprintf('%s_%s.svg', dtype, gamtype), sep = ""),
 ##############################
 # Section 2: Parcel-wise GAM Analyses
 ##############################
+# Loop through 400 Schaefer parcels and run region-specific GAMs
+# Collect GAM stats (F, p)
+# Save output as .csv
+
+# Merge with SA rank and adjust p-values (FDR)
+# Plot brain maps:
+#   - F values
+#   - FDR-significant p-values
+#   - F-based rank and rank significance maps
+
+if(dataset == 'combined'){
+  #### Region-wise GAM Statistics and Derivative-based Temporal Developmental Properties ####
+  #list of regions to run gam.fit.smooth function on below
+  schaefer.regions <- names(metric.schaefer400.all[0:400]) %>% as.data.frame() %>% set_names("region")
+  
+  # fit GAMs for sex
+  gam.variable.schaefer <- matrix(data=NA, nrow=400, ncol=3)
+  #for each schaefer region
+  for(row in c(1:nrow(schaefer.regions))){
+    region <- schaefer.regions$region[row]
+    GAM.RESULTS <- gam.factorsmooth.interaction(measure = 'metric', 
+                                                atlas = 'schaefer400',
+                                                dataset = 'all', 
+                                                region = region,
+                                                smooth_var = smooth_var, 
+                                                int_var = model_var,
+                                                covariates = covars,
+                                                knots = 3, set_fx = FALSE)
+    #and append results to output df
+    gam.variable.schaefer[row,] <- GAM.RESULTS}
+  
+  gam.variable.schaefer <- as.data.frame(gam.variable.schaefer)
+  colnames(gam.variable.schaefer) <- c("region","GAM.variable.Fvalue","GAM.variable.pvalue")
+  cols = c(2:3)
+  gam.variable.schaefer[,cols] = apply(gam.variable.schaefer[,cols], 2,
+                                       function(x) as.numeric(as.character(x)))
+  
+  
+  write.csv(gam.variable.schaefer, paste(outpath, sprintf('csvFiles/%s_%s_statistics.csv',
+                                                          dtype, gamtype),
+                                         sep=""),
+            row.names = F, quote = F)
+  rm(gam.variable.schaefer)
+  gc()
+  
+  # re-read the results from above and compare with SA
+  #GAM age smooth statistics, generated with fitGAMs_fluctuationamplitude_age.R
+  gam.variable.schaefer <- read.csv(paste(outpath, sprintf('csvFiles/%s_%s_statistics.csv',
+                                                           dtype, gamtype),
+                                          sep=""))
+  
+  # SA axis
+  sa.schaefer400 <- read.csv(paste(project_path,
+                                   'data/SArank_schaefer400_7Networks.csv',
+                                   sep = ""))
+  
+  # sa.schaefer400 <- sa.schaefer400 %>% select(-X)
+  colnames(sa.schaefer400) <- c("SA.rank", "region")
+  
+  gam.variable.schaefer$region <- gsub("X", "", gam.variable.schaefer$region)
+  
+  gam.variable.schaefer <- merge(gam.variable.schaefer, sa.schaefer400, by = "region")
+  
+  csvF <- data.frame(gam.variable.schaefer$region)
+  csvF$Fvalue <- gam.variable.schaefer$GAM.variable.Fvalue
+  # pvlues
+  # GAMs
+  pvalues = gam.variable.schaefer$GAM.variable.pvalue
+  GAMpvaluesfdrs<-p.adjust(pvalues, method="BH")
+  
+  csvF$gamPvaluefdr <- GAMpvaluesfdrs
+  outputPath <- paste(outpath, sprintf('csvFiles/%s_%s_F.csv', dtype, gamtype),
+                      sep="")
+  write.csv(csvF, outputPath, row.names=FALSE)
+  
+  # Effect size
+  # brain
+  maxval <- max(abs(gam.variable.schaefer$GAM.variable.Fvalue))
+  
+  ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+        mapping=aes(fill = GAM.variable.Fvalue, colour=I("#e9ecef"),
+                    size=I(.03)), position = c("stacked")) +
+    theme_void() +
+    paletteer::scale_fill_paletteer_c("pals::warmcool",
+                                      na.value="transparent", direction = -1,
+                                      limits = c(-maxval, maxval),
+                                      oob = squish)
+  
+  ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_Fvalue.svg', dtype,
+                                           gamtype),
+                          sep = ""),
+         dpi = 300, width = 3 , height = 2)
+  
+  
+  # Replace GAM.variable.Fvalue with ranks robustly
+  # (1) Rank F values
+  gam.variable.schaefer$GAM.variable.rankF <- rank(
+    gam.variable.schaefer$GAM.variable.Fvalue, 
+    ties.method = "average"
+  )
+  
+  # (2) Find the nearest negative value, if it exists
+  neg_vals <- gam.variable.schaefer$GAM.variable.Fvalue[
+    gam.variable.schaefer$GAM.variable.Fvalue < 0
+  ]
+  
+  if (length(neg_vals) > 0) {
+    # (3) Center ranks around the largest negative value (i.e., nearest to 0)
+    nearestNeg <- max(neg_vals)
+    nearestNegIdx <- which(gam.variable.schaefer$GAM.variable.Fvalue == nearestNeg)
+    nearestNegRank <- gam.variable.schaefer$GAM.variable.rankF[nearestNegIdx]
+    
+    gam.variable.schaefer$GAM.variable.rankF <- 
+      gam.variable.schaefer$GAM.variable.rankF - (nearestNegRank + 1)
+    
+    centered <- TRUE
+  } else {
+    # No negatives — do not shift the ranks
+    centered <- FALSE
+  }
+  
+  # (4) Max absolute value (for plotting scale)
+  maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankF), na.rm = TRUE)
+  
+  
+  # brain ranks
+  ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+        mapping=aes(fill = GAM.variable.rankF, colour=I("#e9ecef"), size=I(.03)),
+        position = c("stacked")) + theme_void() +
+    paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent",
+                                      direction = -1,
+                                      limits = c(-maxval, maxval),
+                                      oob = squish)
+  
+  
+  ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_rank_Fvalue.svg',
+                                           dtype, gamtype),
+                          sep = ""),
+         dpi = 300, width = 3 , height = 2)
+  
+  # brain pvalues
+  # GAM
+  pvalues = gam.variable.schaefer$GAM.variable.pvalue
+  pvaluesfdrs<-p.adjust(pvalues, method="BH")
+  
+  GAMsignumber = sum(pvaluesfdrs < 0.05, na.rm=TRUE)
+  pvaluesfdrs[pvaluesfdrs >= 0.05] <- NA
+  gam.variable.schaefer$GAM.variable.pvaluefdr <- pvaluesfdrs
+  
+  ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+        mapping=aes(fill = GAM.variable.pvaluefdr, colour=I("#e9ecef"), size=I(.03)),
+        position = c("stacked")) + theme_void() + ggtitle(GAMsignumber) +
+    paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent",
+                                      direction = -1,
+                                      limits = c(0, 0.05),
+                                      # limits = c(min(metric.regional.statistics$GAM.smooth.pvalue),
+                                      #            max(metric.regional.statistics$GAM.smooth.pvalue)),
+                                      oob = squish)
+  
+  ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_pval_Fvalue.svg',
+                                           dtype, gamtype),
+                          sep = ""),
+         dpi = 300, width = 3 , height = 2)
+  
+  # significant ranks
+  pvalues = gam.variable.schaefer$GAM.variable.pvalue
+  pvaluesfdrs <- p.adjust(pvalues, method="BH")
+  rankFsig <- gam.variable.schaefer$GAM.variable.rankF
+  rankFsig[(pvaluesfdrs >= 0.05)] <- NA
+  gam.variable.schaefer$GAM.variable.rankFsig <- rankFsig
+  
+  maxval <- max(abs(gam.variable.schaefer$GAM.variable.rankFsig), na.rm=T)
+  
+  # brain significant ranks
+  ggseg(.data = gam.variable.schaefer, atlas = "schaefer7_400",
+        mapping=aes(fill = GAM.variable.rankFsig, colour=I("#e9ecef"), size=I(.03)),
+        position = c("stacked")) + theme_void() + ggtitle(GAMsignumber) +
+    paletteer::scale_fill_paletteer_c("pals::warmcool", na.value="transparent",
+                                      direction = -1,
+                                      limits = c(-maxval, maxval),
+                                      oob = squish)
+  
+  ggsave(filename = paste(outpath, sprintf('%s_%s_brainmap_ranksig_Fvalue.svg',
+                                           dtype, gamtype),
+                          sep = ""),
+         dpi = 300, width = 3 , height = 2)
+}

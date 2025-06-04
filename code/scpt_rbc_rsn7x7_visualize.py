@@ -52,7 +52,7 @@ for iType in dtype:
     temp_rsn = np.zeros((7, 7))
     temp_rsn[mask] = age_eff[effect_label].values
     temp_rsn = temp_rsn + temp_rsn.T
-    # np.fill_diagonal(temp_rsn, 1)
+    np.fill_diagonal(temp_rsn, temp_rsn.diagonal()/2)
 
     temp_pvalfdr = np.zeros((7, 7))
     temp_pvalfdr[mask] = age_eff[pval_label].values
@@ -83,7 +83,7 @@ for iType in dtype:
     if metric == 'age':
         maxvalue = 0.25
     elif metric == 'pfactor':
-        maxvalue = 0.02
+        maxvalue = 0.01
 
     plt.ion()
     ax = sns.heatmap(reordered_rsn_ageeff, cmap='coolwarm',
@@ -92,11 +92,11 @@ for iType in dtype:
                      linewidth=0.5,
                      vmin=-maxvalue, vmax=maxvalue)
     # ax.axes.set_title('Partial R2 - %s' % iType)
-    ax.figure.set_figwidth(5)  # 4.5 7
-    ax.figure.set_figheight(4)  # 4 6
+    ax.figure.set_figwidth(7)  # 4.5 7 5
+    ax.figure.set_figheight(6)  # 4  6 4
     plt.tight_layout()
     plt.show()
-    plt.savefig(datapath + 'results/function/' +
+    plt.savefig(datapath + 'results/revision/sex/function/' +
                 'combined_df_withinbetween_fcrsn7_' +
                 '%s_%s_statistics_asterisk.svg'
                 % (iType, metric),

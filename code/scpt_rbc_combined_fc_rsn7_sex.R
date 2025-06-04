@@ -57,10 +57,10 @@ netpair.schaefer400.all$sex <- as.factor(netpair.schaefer400.all$sex)
 
 # Filter out rows where sex is not "female" or "male"
 netpair.schaefer400.all <- netpair.schaefer400.all %>%
-  filter(sex %in% c("Female", "Male"))
+  filter(sex %in% c("Male", "Female"))
 
 netpair.schaefer400.all$sex <- factor(netpair.schaefer400.all$sex, 
-                                      levels = c("Female", "Male"), 
+                                      levels = c("Male", "Female"), 
                                       ordered = FALSE)
 
 # # ordered
@@ -110,16 +110,16 @@ if(dataset == 'combined'){
   gam.variable <- as.data.frame(gam.variable)
   colnames(gam.variable) <- c("netpair","GAM.variable.Fvalue","GAM.variable.pvalue",
                               "GAM.variable.partialR2",
-                              "Anova.pfactor.pvalue")
+                              "Anova.variable.pvalue")
   
   # pvalues
   pvalues = gam.variable$GAM.variable.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
   gam.variable$GAM.variable.pvaluefdr <- pvaluesfdrs
   
-  pvalues = gam.variable$Anova.pfactor.pvalue
+  pvalues = gam.variable$Anova.variable.pvalue
   pvaluesfdrs<-p.adjust(pvalues, method="BH")
-  gam.variable$Anova.pfactor.pvaluefdr <- pvaluesfdrs
+  gam.variable$Anova.variable.pvaluefdr <- pvaluesfdrs
   
   # make sure values are numerical
   cols = c(2:6)
