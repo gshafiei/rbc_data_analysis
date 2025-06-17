@@ -81,7 +81,7 @@ for iType in dtype:
     # maxvalue = np.nanmax(np.abs(temp_rsn))
     # print('\nmax value: %s' % str(maxvalue))
     if metric == 'age':
-        maxvalue = 0.25
+        maxvalue = 0.15
     elif metric == 'pfactor':
         maxvalue = 0.01
 
