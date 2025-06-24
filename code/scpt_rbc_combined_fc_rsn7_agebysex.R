@@ -88,8 +88,7 @@ if(dataset == 'combined'){
   # network connectivity GAMs
   #empty matrix to save gam.fit output to
   gam.variable <- matrix(data=NA, nrow=28, ncol=3)
-  # also estimate a sign for F-stat by predicting outputs for F and M and finding the average difference
-  gam.variable.sign <- matrix(data=NA, nrow=28, ncol=1)
+
   #for each network pair
   for(row in c(1:nrow(netpair_labels))){
     netpair <- netpair_labels$netpair[row]
@@ -132,13 +131,6 @@ if(dataset == 'combined'){
                                                                   increments = 200)
     predicted.metric.M$sex <- 'Male'
     
-    # differences
-    diff <-predicted.metric.F$.fitted - predicted.metric.M$.fitted
-    mean_diff <- mean(diff, na.rm = TRUE)
-    
-    # append sign to output df
-    gam.variable.sign[row,] <- mean_diff
-    
     # combine
     predicted.metric <- bind_rows(predicted.metric.F, predicted.metric.M)
     
@@ -157,15 +149,8 @@ if(dataset == 'combined'){
   gam.variable[,cols] = apply(gam.variable[,cols], 2,
                               function(x) as.numeric(as.character(x)))
   
-  # add sign
-  gam.variable.sign <- as.data.frame(gam.variable.sign)
-  colnames(gam.variable.sign) <- c("meandiff")
-  
-  signed_F <- gam.variable$GAM.variable.Fvalue * sign(gam.variable.sign$meandiff)
-  gam.variable$GAM.variable.Fvalue.signed <- signed_F
-  
   write.csv(gam.variable, paste(outpath,
-                                sprintf('csvFiles/%s_%s_statistics_signed.csv',
+                                sprintf('csvFiles/%s_%s_statistics.csv',
                                         dtype, gamtype),
                                 sep = ""),
             row.names = F, quote = F)
