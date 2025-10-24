@@ -9,7 +9,7 @@ Please cite appropriately and consult [https://reprobrainchart.github.io/docs/ge
 ## `code`
 All analysis and data preparation code is located in the [`code/`](code/) folder. Code is written in Python and R.
 
-### Functional Data Workflow (Python):
+### Functional Data Workflow (Python + R):
 1. **Obtaining Data**: Follow instructions in [GetData](https://reprobrainchart.github.io/docs/get_data) to clone C-PAC files. Two versions are used:
    - `warning-fail` (labeled as `noqc` within scripts and filenames): Includes all scans, even failed ones.
    - `complete-artifact` (labeled as `artifact` within scripts and filenames): Excludes scans marked as "Fail".
@@ -27,26 +27,6 @@ All analysis and data preparation code is located in the [`code/`](code/) folder
 
 5. **Additional Visualization (Python)**:
    - `scpt_rbc_rsn7x7_visualize.py`: Generates a subset of figures based on functional data. The rest of the figures are generated within R scripts (i.e., `scpt_rbc_combined_fc_rsn7.R`).
-  
-### Functional Data Workflow (Python + R):
-1. **Data Acquisition**: Follow instructions in [GetData](https://reprobrainchart.github.io/docs/get_data) to clone CPAC files. Two versions are used:
-   - `warning-fail` or `noqc`: Includes all scans, even failed ones.
-   - `complete-artifact`: Excludes scans marked as "Fail" only.
-
-2. **Within- and Between-Network FC Calculation**:
-   - `scpt_rbc_withinbetween_rsnFC.py`: Computes within- and between-network functional connectivity matrices.
-
-3. **Data Preparation for R Analyses**:
-   - `scpt_prepare_for_r_fc_rsn.py`: Prepares and saves the data for later use in R-based GAM analysis.
-
-4. **Modeling and Visualization (R)**:
-   - `scpt_rbc_combined_fc_rsn7.R`: Performs GAM analyses on functional connectivity data (combined and study-specific).
-   - `func_GAM_rbc.R`: Provides GAM fitting functions.
-   - `covbat.R`: Harmonizes functional data across sites before modeling.
-
-5. **Additional Visualization (Python)**:
-   - `scpt_rbc_rsn7x7_visualize.py`: Generates a subset of figures based on functional data.
-
 
 ### Structural Data Workflow (Python + R):
 1. **Obtaining Data**: Again, follow [GetData](https://reprobrainchart.github.io/docs/get_data) to clone FreeSurfer files. Two versions used:
