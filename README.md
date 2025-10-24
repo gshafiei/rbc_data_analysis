@@ -1,5 +1,5 @@
 # Example analysis workflow for RBC dataset
-This repository contains scripts and supporting data for analyzing functional and structural neuroimaging data in relation to development and psychopathology, as part of the Reproducible Brain Charts (RBC) initiative and in support of the preprint:
+This repository contains scripts and supporting data for analyzing functional and structural neuroimaging data in relation to development and psychopathology, as part of the Reproducible Brain Charts (RBC) initiative and in support of the publication:
 
 Shafiei G, Esper NB, et al., (2025). Reproducible Brain Charts: An open data resource for mapping brain development and its associations with mental health. Neuron. DOI: [10.1016/j.neuron.2025.08.026](https://doi.org/10.1016/j.neuron.2025.08.026)
 
